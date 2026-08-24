@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Secrets / environment — ignore all .env variants EXCEPT the examples
+.env
+.env.*
+!.env.example
+*.local
+
+# Test coverage
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Uploaded / temp files (resume parsing scratch space)
+uploads/
+tmp/
+temp/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
