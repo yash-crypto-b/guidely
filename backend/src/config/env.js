@@ -26,12 +26,16 @@ if (existsSync(envPath)) {
 // or leak a half-configured state. Coerce numeric strings to numbers here so
 // the rest of the app gets real types.
 
+// Helper: strip quotes and trailing slashes from env vars (common copy-paste issues)
+const clean = (v) => (typeof v === 'string' ? v.replace(/^['"]|['"]$/g, '').replace(/\/+$/, '') : v);
+const envVal = (key) => clean(process.env[key]);
+
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  FRONTEND_ORIGIN: z.string().url(),
+  FRONTEND_ORIGIN: z.string().min(1, 'FRONTEND_ORIGIN is required'),
 
-  SUPABASE_URL: z.string().url(),
+  SUPABASE_URL: z.string().min(1, 'SUPABASE_URL is required'),
   SUPABASE_SECRET_KEY: z.string().min(1, 'SUPABASE_SECRET_KEY is required'),
   SUPABASE_JWT_SECRET: z.string().optional(),
 
@@ -70,7 +74,13 @@ const schema = z.object({
   ERROR_TRACKING_ENABLED: z.coerce.boolean().default(true),
 });
 
-const parsed = schema.safeParse(process.env);
+// Clean all string env vars before validation (strip quotes, trailing slashes)
+const cleanedEnv = {};
+for (const [key, value] of Object.entries(process.env)) {
+  cleanedEnv[key] = typeof value === 'string' ? clean(value) : value;
+}
+
+const parsed = schema.safeParse(cleanedEnv);
 
 if (!parsed.success) {
   // Print which keys are wrong — but never their values (may be secret).
@@ -78,7 +88,8 @@ if (!parsed.success) {
     .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
     .join('\n');
   console.error(`\n[env] Invalid environment configuration:\n${issues}\n`);
-  console.error('Copy backend/.env.example to backend/.env and fill it in.\n');
+  console.error('Set these as environment variables in your hosting dashboard (Render/Vercel/etc).\n');
+  console.error('Required variables: PORT, NODE_ENV, FRONTEND_ORIGIN, SUPABASE_URL, SUPABASE_SECRET_KEY, NVIDIA_API_KEY\n');
   process.exit(1);
 }
 
