@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Environment — ignore all .env variants EXCEPT the example
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Test output
+coverage/
+
+# Uploaded / temp files
+uploads/
+tmp/
+temp/
+test_cv.tex
+test_cv.pdf
+test_cv2.tex
+test_cv2.pdf
+test.pdf
+test.tex
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# LaTeX compiler (download separately — too large for git)
+tectonic.exe
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db

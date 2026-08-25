@@ -1,11 +1,25 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
 // Load backend/.env if it exists (absolute path, so it works regardless of the
 // process cwd). In production, env comes from the platform and no file is needed.
+// NOTE: process.loadEnvFile() does NOT override existing env vars, so if the
+// platform sets PORT=0 (as Freebuff does), the .env value is ignored. We read
+// the file ourselves to guarantee .env values always take precedence in dev.
 const envPath = join(import.meta.dirname, '../../.env');
-if (existsSync(envPath)) process.loadEnvFile(envPath);
+if (existsSync(envPath)) {
+  const lines = readFileSync(envPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim();
+    process.env[key] = value;
+  }
+}
 
 // Validate process.env at boot. Fail fast + loud if anything is missing or
 // malformed — a misconfigured server should never start and serve broken auth
@@ -29,6 +43,31 @@ const schema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   AI_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(3_600_000),
   AI_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+
+  // Redis (optional - falls back to in-memory if not set)
+  REDIS_URL: z.string().optional(),
+
+  // Quota limits (optional - defaults shown)
+  ANALYSIS_QUOTA_PER_HOUR: z.coerce.number().int().positive().default(20),
+  ANALYSIS_QUOTA_PER_DAY: z.coerce.number().int().positive().default(100),
+  CV_QUOTA_PER_HOUR: z.coerce.number().int().positive().default(10),
+  CV_QUOTA_PER_DAY: z.coerce.number().int().positive().default(50),
+  COMPILE_QUOTA_PER_HOUR: z.coerce.number().int().positive().default(10),
+  COMPILE_QUOTA_PER_DAY: z.coerce.number().int().positive().default(50),
+
+  // File validation limits
+  MAX_FILE_SIZE_MB: z.coerce.number().positive().default(5),
+  MAX_PDF_PAGES: z.coerce.number().int().positive().default(10),
+
+  // Text validation limits
+  MIN_RESUME_LENGTH: z.coerce.number().int().positive().default(50),
+  MAX_RESUME_LENGTH: z.coerce.number().int().positive().default(15_000),
+  MIN_JD_LENGTH: z.coerce.number().int().positive().default(50),
+  MAX_JD_LENGTH: z.coerce.number().int().positive().default(10_000),
+
+  // Error tracking (optional - for production monitoring)
+  SENTRY_DSN: z.string().optional(),
+  ERROR_TRACKING_ENABLED: z.coerce.boolean().default(true),
 });
 
 const parsed = schema.safeParse(process.env);
