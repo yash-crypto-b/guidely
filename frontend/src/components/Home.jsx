@@ -4,7 +4,7 @@ import { AnalysisForm } from '@/components/AnalysisForm';
 import { AnalysisResults } from '@/components/AnalysisResults';
 import { useTheme } from '@/lib/ThemeContext';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export function Home({ user }) {
   const [result, setResult] = useState(null);
@@ -58,7 +58,7 @@ export function Home({ user }) {
       setResult(prev => ({ ...prev, custom_cv: data.custom_cv }));
     } catch (err) {
       console.error('CV generation error:', err);
-      setCvError(`CV generation failed: ${err.message}. You can still use the analysis above.`);
+      setCvError('Unable to generate optimized resume. Please try again later.');
     } finally {
       setCvLoading(false);
     }
@@ -89,7 +89,7 @@ export function Home({ user }) {
       setResult(prev => ({ ...prev, cover_letter: data.cover_letter }));
     } catch (err) {
       console.error('Cover letter generation error:', err);
-      setCoverLetterError(`Cover letter generation failed: ${err.message}. You can still use the analysis above.`);
+      setCoverLetterError('Unable to generate cover letter. Please try again later.');
     } finally {
       setCoverLetterLoading(false);
     }

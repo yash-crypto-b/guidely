@@ -11,4 +11,6 @@ services:
         value: production
       - key: PORT
         value: 4000
+      - key: FRONTEND_ORIGIN
+        sync: false  # Set to your Vercel frontend URL in Render dashboard
     healthCheckPath: /health

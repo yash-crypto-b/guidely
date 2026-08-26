@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export function AnalysisForm({ user, onResult }) {
   const [token, setToken] = useState('');
@@ -120,7 +120,7 @@ export function AnalysisForm({ user, onResult }) {
       if (err.name === 'AbortError') {
         setError('Analysis timed out after 120 seconds. The AI service may be overloaded — please try again in a minute.');
       } else if (err.message === 'Failed to fetch' || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        setError('Cannot connect to the server. Please make sure the backend is running:\n\n1. Open a terminal\n2. Run: cd backend && npm run dev\n3. Wait for "Server running on port 4000"\n4. Refresh this page and try again');
+        setError('The server is experiencing heavy traffic. Please try again in a few moments.');
       } else {
         setError(err.message || 'An unexpected error occurred. Please try again.');
       }
