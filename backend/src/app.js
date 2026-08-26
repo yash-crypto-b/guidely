@@ -14,6 +14,39 @@ import { getAIServiceHealth } from './lib/ai.js';
 import { errorTracker, ErrorCategory } from './lib/errorTracker.js';
 import { getSecurityHeaders } from './lib/security.js';
 
+function createCorsOriginChecker() {
+  const configuredOrigins = env.FRONTEND_ORIGIN
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const allowedPatterns = [
+    ...configuredOrigins.map((origin) => {
+      try {
+        return new URL(origin).origin;
+      } catch {
+        return origin;
+      }
+    }),
+    /^https:\/\/.*\.vercel\.app$/i,
+    /^http:\/\/localhost(?::\d+)?$/i,
+    /^http:\/\/127\.0\.0\.1(?::\d+)?$/i,
+  ];
+
+  return (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    const allowed = allowedPatterns.some((pattern) => {
+      if (pattern instanceof RegExp) return pattern.test(origin);
+      return pattern === origin;
+    });
+
+    if (allowed) return callback(null, true);
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  };
+}
+
 // Build the Express app (no listen) so tests can import it without binding a port.
 export function buildApp() {
   const app = express();
@@ -31,7 +64,7 @@ export function buildApp() {
 
   // Strict CORS configuration
   app.use(cors({
-    origin: env.FRONTEND_ORIGIN,
+    origin: createCorsOriginChecker(),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
