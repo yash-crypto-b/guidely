@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 build/
+.next/
 
 # Secrets / environment — ignore all .env variants EXCEPT the examples
 .env
@@ -33,3 +34,6 @@ temp/
 # OS
 .DS_Store
 Thumbs.db
+
+# Turbo
+.turbo/
