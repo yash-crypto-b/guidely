@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+      
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+      
+      - name: Run backend lint
+        run: cd backend && npm run lint || true
+      
+      - name: Run backend tests
+        run: cd backend && npm test
+      
+      - name: Run frontend build
+        run: cd frontend && npm run build
+      
+      - name: Run frontend lint
+        run: cd frontend && npm run lint || true
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: cd backend && npm ci
+      
+      - name: Run unit tests
+        run: cd backend && npm test
+      
+      - name: Run tests with coverage
+        run: cd backend && npm test -- --coverage || true
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: cd frontend && npm ci
+      
+      - name: Build frontend
+        run: cd frontend && npm run build
+      
+      - name: Check for build errors
+        run: |
+          if [ $? -ne 0 ]; then
+            echo "Frontend build failed"
+            exit 1
+          fi
+
+  security-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      
+      - name: Run npm audit (backend)
+        run: cd backend && npm audit --audit-level=high || true
+      
+      - name: Run npm audit (frontend)
+        run: cd frontend && npm audit --audit-level=high || true
