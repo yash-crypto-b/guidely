@@ -4,7 +4,7 @@ import { AnalysisForm } from '@/components/AnalysisForm';
 import { AnalysisResults } from '@/components/AnalysisResults';
 import { useTheme } from '@/lib/ThemeContext';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://guidely-backend.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://guidely-1.onrender.com';
 
 export function Home({ user }) {
   const [result, setResult] = useState(null);

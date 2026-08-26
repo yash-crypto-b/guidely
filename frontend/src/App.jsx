@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, isConfigured } from '@/lib/supabase';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Home } from '@/components/Home';
 import { ThemeProvider } from '@/lib/ThemeContext';
@@ -9,11 +9,36 @@ import { PrivacyPolicy } from '@/components/PrivacyPolicy';
 import { AboutPage } from '@/components/AboutPage';
 import { ServicesPage } from '@/components/ServicesPage';
 
+function ConfigError() {
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-6">
+      <div className="max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">Missing Environment Variables</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
+          This app requires Supabase configuration. Add these variables in your Vercel dashboard:
+        </p>
+        <code className="block text-left text-sm bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-4 text-gray-800 dark:text-gray-200">
+          VITE_SUPABASE_URL=your-project-url<br />
+          VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+        </code>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Then redeploy this project.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isConfigured) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -27,6 +52,10 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  if (!isConfigured) {
+    return <ConfigError />;
+  }
 
   if (loading) {
     return (
