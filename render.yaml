@@ -12,5 +12,11 @@ services:
       - key: PORT
         value: 4000
       - key: FRONTEND_ORIGIN
-        sync: false  # Set to your Vercel frontend URL in Render dashboard
+        value: https://guidely-t9qi-ddhyp2qvl-yash-crypto-bs-projects.vercel.app
+      # These must be set in the Render dashboard (Settings > Environment):
+      # - SUPABASE_URL
+      # - SUPABASE_SECRET_KEY
+      # - NVIDIA_API_KEY
+      # - NVIDIA_MODEL (default: nvidia/nemotron-3-nano-30b-a3b)
+      # - NVIDIA_BASE_URL (default: https://integrate.api.nvidia.com/v1)
     healthCheckPath: /health
