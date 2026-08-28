@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getApiBase } from '@/lib/api';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://guidely-1.onrender.com';
+const API_BASE = getApiBase();
 
 export function AnalysisForm({ user, onResult }) {
   const [token, setToken] = useState('');
@@ -113,14 +114,14 @@ export function AnalysisForm({ user, onResult }) {
 
       onResult({
         ...data,
-        _meta: { jobDescription: jd, resumeText: resume },
+        _meta: { jobDescription: jd, resumeText: data.parsedResumeText || resume },
       });
     } catch (err) {
       console.error('Analysis error:', err);
       if (err.name === 'AbortError') {
         setError('Analysis timed out after 120 seconds. The AI service may be overloaded — please try again in a minute.');
       } else if (err.message === 'Failed to fetch' || err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        setError('The server is experiencing heavy traffic. Please try again in a few moments.');
+        setError('We could not reach the analysis server. Please make sure the backend is running, then try again.');
       } else {
         setError(err.message || 'An unexpected error occurred. Please try again.');
       }
@@ -132,64 +133,66 @@ export function AnalysisForm({ user, onResult }) {
   return (
     <form onSubmit={onSubmit} className="space-y-0">
       {/* Job Description */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-t-xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-sm font-semibold text-gray-900 dark:text-white">Job Description</label>
-          <span className="text-xs text-gray-400 dark:text-gray-500">{jobDescription.length.toLocaleString()} / 5000</span>
+      <div className="rounded-t-[20px] border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-[rgba(18,20,28,0.82)] p-6">
+        <div className="flex items-center justify-between mb-4">
+          <label className="text-[13px] font-semibold uppercase tracking-[1.2px] text-gray-500 dark:text-[#b8b5bd]">Job Description</label>
+          <span className="text-[12px] text-gray-400 dark:text-[#6b6e78]">{jobDescription.length.toLocaleString()} / 5000</span>
         </div>
         <textarea
           rows={8}
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
           placeholder="Paste the full job description here..."
-          className="w-full resize-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none bg-transparent"
+          className="w-full resize-none text-[15px] text-gray-900 dark:text-[#f7f2ed] placeholder-gray-400 dark:placeholder-[#6b6e78] focus:outline-none bg-transparent leading-relaxed"
           disabled={busy}
         />
       </div>
 
       {/* Against divider */}
-      <div className="flex items-center justify-center py-3 bg-gray-50 dark:bg-gray-800/50">
-        <span className="text-xs font-semibold tracking-widest text-gray-400 dark:text-gray-500 uppercase">Against</span>
+      <div className="flex items-center justify-center py-3 bg-gray-50 dark:bg-[rgba(18,20,28,0.5)] border-x border-gray-200 dark:border-white/[0.06]">
+        <span className="text-[11px] font-semibold tracking-[0.2em] uppercase text-gray-400 dark:text-[#6b6e78]">Against</span>
       </div>
 
       {/* Resume */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-b-xl p-5">
-        <label className="text-sm font-semibold text-gray-900 dark:text-white mb-3 block">Your Resume</label>
+      <div className="rounded-b-[20px] border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-[rgba(18,20,28,0.82)] p-6">
+        <label className="text-[13px] font-semibold uppercase tracking-[1.2px] text-gray-500 dark:text-[#b8b5bd] mb-4 block">Your Resume</label>
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-            isDragOver ? 'border-[#5B5FC7] bg-[#5B5FC7]/5'
-            : selectedFile ? 'border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
-            : 'border-gray-200 dark:border-gray-600 hover:border-[#5B5FC7]/50 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+          className={`border border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+            isDragOver
+              ? 'border-[#f575ad]/50 bg-[#f575ad]/[0.04]'
+              : selectedFile
+                ? 'border-[#22c55e]/30 bg-[#22c55e]/[0.04]'
+                : 'border-gray-300 dark:border-white/[0.08] hover:border-pink-300 dark:hover:border-[#f575ad]/30 hover:bg-gray-50 dark:hover:bg-white/[0.02]'
           }`}
         >
           <input ref={fileInputRef} type="file" accept=".txt,.pdf" onChange={handleFileChange} className="hidden" disabled={busy} />
           {selectedFile ? (
             <div className="flex items-center justify-center gap-2">
-              <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-5 w-5 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">{fileName}</span>
-              <span className="text-xs text-green-600 dark:text-green-500">— Click to change</span>
+              <span className="text-sm font-medium text-[#22c55e]">{fileName}</span>
+              <span className="text-[12px] text-[#6b6e78]">— Click to change</span>
             </div>
           ) : (
             <>
-              <svg className="h-10 w-10 mx-auto text-gray-300 dark:text-gray-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="h-8 w-8 mx-auto text-[#6b6e78] mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <span className="font-semibold text-[#5B5FC7]">Click to upload</span> or drag and drop
+              <p className="text-sm text-gray-600 dark:text-[#b8b5bd]">
+                <span className="font-semibold text-[#f575ad]">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">PDF or TXT (Max 5MB)</p>
+              <p className="text-[12px] text-gray-400 dark:text-[#6b6e78] mt-1">PDF or TXT (Max 5MB)</p>
             </>
           )}
         </div>
 
         <div className="flex items-center justify-center py-4">
-          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Or paste resume text</span>
+          <span className="text-[12px] font-medium text-gray-400 dark:text-[#6b6e78]">Or paste resume text</span>
         </div>
 
         <textarea
@@ -197,22 +200,22 @@ export function AnalysisForm({ user, onResult }) {
           value={selectedFile && resumeText === '[PDF_UPLOADED]' ? '' : resumeText}
           onChange={(e) => { setResumeText(e.target.value); setFileName(''); setSelectedFile(null); }}
           placeholder="Paste your resume content here..."
-          className="w-full resize-none text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-transparent"
+          className="w-full resize-none text-[15px] text-gray-900 dark:text-[#f7f2ed] placeholder-gray-400 dark:placeholder-[#6b6e78] focus:outline-none border border-gray-200 dark:border-white/[0.08] rounded-xl p-4 bg-transparent leading-relaxed transition-colors focus:border-[#f575ad]/30"
           disabled={busy || !!selectedFile}
         />
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+        <div className="mt-4 p-4 rounded-xl border border-red-500/20 bg-red-500/[0.06]">
           <div className="flex items-start gap-2.5">
-            <svg className="h-5 w-5 text-red-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-4 w-4 text-red-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            <div className="text-sm text-red-700 dark:text-red-400">
-              <p className="font-semibold mb-1">Analysis Error</p>
+            <div className="text-sm text-red-300">
+              <p className="font-semibold mb-1 text-red-200">Analysis Error</p>
               {error.split('\n').map((line, i) => (
-                <p key={i} className="text-red-600 dark:text-red-400">{line}</p>
+                <p key={i} className="text-red-300/80">{line}</p>
               ))}
             </div>
           </div>
@@ -222,17 +225,17 @@ export function AnalysisForm({ user, onResult }) {
       {/* Progress */}
       {busy && (
         <div className="mt-4 space-y-2">
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex justify-between text-[12px] text-[#6b6e78]">
             <span>Analyzing your resume...</span>
             <span>{elapsedTime}s elapsed</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-            <div 
-              className="h-full bg-[#5B5FC7] rounded-full transition-all duration-1000 ease-out" 
-              style={{ width: `${Math.min(90, elapsedTime * 6)}%` }} 
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full bg-[#f575ad] rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${Math.min(90, elapsedTime * 6)}%` }}
             />
           </div>
-          <p className="text-xs text-center text-gray-400 dark:text-gray-500">Usually takes 5-15 seconds</p>
+          <p className="text-[12px] text-center text-[#6b6e78]">Usually takes 5–15 seconds</p>
         </div>
       )}
 
@@ -242,14 +245,14 @@ export function AnalysisForm({ user, onResult }) {
           type="button"
           onClick={handleClear}
           disabled={busy}
-          className="px-5 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+          className="px-5 py-2.5 text-[14px] font-medium text-gray-600 dark:text-[#b8b5bd] border border-gray-200 dark:border-white/[0.08] rounded-xl hover:bg-gray-100 dark:hover:bg-white/[0.04] disabled:opacity-50 transition-colors"
         >
-          Clear Form
+          Clear
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="px-6 py-2.5 text-sm font-semibold text-white bg-[#5B5FC7] hover:bg-[#4A4EB5] rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
+          className="px-6 py-2.5 text-[14px] font-semibold text-[#0f1217] bg-[#f575ad] rounded-xl shadow-[0_12px_28px_rgba(242,125,184,0.24)] disabled:opacity-50 transition-transform hover:-translate-y-0.5 flex items-center gap-2"
         >
           {busy ? (
             <>

@@ -1,18 +1,28 @@
-import { env } from '../config/env.js';
+import OpenAI from 'openai';
+import { aiConfig } from '../config/env.js';
 import { nvidiaCircuitBreaker, CircuitBreakerError } from './circuitBreaker.js';
 import { errorTracker, ErrorCategory, Severity } from './errorTracker.js';
 import { sanitizeForAI, validateLatexOutput, validateLength, LENGTH_LIMITS } from './security.js';
 
-// Fallback model if primary is overloaded (Nemotron Mini is faster)
-const FALLBACK_MODEL = 'nvidia/nemotron-mini-4b-instruct';
+// Fallback model if the primary model is overloaded.
+const FALLBACK_MODEL = 'deepseek-ai/deepseek-r1';
 
-// Nemotron Mini has 4096 token context window
-// ~1 token ≈ 4 chars for English text
-const CONTEXT_WINDOW = 4096;
+// Token estimation (conservative)
 const CHARS_PER_TOKEN = 4;
-const SAFETY_MARGIN = 100; // Reduced safety margin for more output tokens
+
+export const aiClient = new OpenAI({
+  apiKey: aiConfig.apiKey,
+  baseURL: aiConfig.baseUrl,
+});
 
 const BACKSLASH = String.fromCharCode(92);
+
+function createAIError(message, status, extras = {}) {
+  const error = new Error(message);
+  error.status = status;
+  Object.assign(error, extras);
+  return error;
+}
 
 /** Estimate token count from text */
 function estimateTokens(text) {
@@ -22,7 +32,7 @@ function estimateTokens(text) {
 /** Calculate safe max_tokens based on messages */
 function safeMaxTokens(messages, desiredMax = 2048) {
   const usedTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
-  const available = CONTEXT_WINDOW - usedTokens - SAFETY_MARGIN;
+  const available = 16384 - usedTokens - 100;
   // Ensure at least 1000 tokens for response to avoid cut-off JSON
   return Math.min(desiredMax, Math.max(1000, available));
 }
@@ -35,75 +45,90 @@ function truncateToBudget(text, maxTokens) {
   return text.substring(0, maxChars) + '\n...[truncated]';
 }
 
-// Call NVIDIA API with circuit breaker + retry + fallback model
+// Call NVIDIA API via OpenAI-compatible client with circuit breaker + retry
 async function callNvidia(messages, maxTokens = 2048, timeoutMs = 60_000, model = null) {
-  const targetModel = model || env.NVIDIA_MODEL;
+  const targetModel = model || aiConfig.model;
   const maxRetries = model ? 1 : 2;
 
   return nvidiaCircuitBreaker.execute(async () => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-      let res;
       try {
-        res = await fetch(`${env.NVIDIA_BASE_URL}/chat/completions`, {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: targetModel,
-            messages,
-            temperature: 0.3,
-            max_tokens: maxTokens,
-          }),
-        });
-      } finally {
-        clearTimeout(timeout);
-      }
-
-      if (res.ok) {
-        const data = await res.json();
-        errorTracker.addBreadcrumb('ai', `NVIDIA ${targetModel} succeeded`, {
+        const completion = await aiClient.chat.completions.create({
           model: targetModel,
-          tokens: data.usage?.total_tokens,
+          messages,
+          temperature: 0.3,
+          max_tokens: maxTokens,
+          top_p: 0.95,
+          stream: false,
+          chat_template_kwargs: { enable_thinking: false },
+        }, {
+          timeout: timeoutMs,
         });
-        return data.choices?.[0]?.message?.content ?? '';
-      }
 
-      const body = await res.text();
-      console.error(`[ai] NVIDIA ${targetModel} error ${res.status} (attempt ${attempt}/${maxRetries}):`, body.substring(0, 500));
+        const content = completion.choices?.[0]?.message?.content || '';
 
-      errorTracker.addBreadcrumb('ai', `NVIDIA ${targetModel} error ${res.status}`, {
-        model: targetModel,
-        status: res.status,
-        attempt,
-      });
+        errorTracker.addBreadcrumb('ai', `${targetModel} succeeded`, {
+          model: targetModel,
+          tokens: completion.usage?.total_tokens,
+        });
+        return content;
+      } catch (err) {
+        const status = err?.status ?? err?.response?.status ?? err?.code;
+        const body = err?.error?.message || err?.message || '';
 
-      if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
-        const delay = attempt * 2000;
-        console.log(`[ai] Retrying in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
+        if (status) {
+          console.error(`[ai] ${targetModel} error ${status} (attempt ${attempt}/${maxRetries}):`, body.substring(0, 500));
 
-      if (res.status >= 500 && targetModel === env.NVIDIA_MODEL) {
-        console.log(`[ai] Primary model overloaded, trying fallback: ${FALLBACK_MODEL}`);
-        try {
-          return await callNvidiaDirect(messages, maxTokens, timeoutMs, FALLBACK_MODEL);
-        } catch (fallbackErr) {
-          console.error('[ai] Fallback also failed:', fallbackErr.message);
+          errorTracker.addBreadcrumb('ai', `${targetModel} error`, {
+            model: targetModel,
+            status,
+            attempt,
+          });
+
+          if ((status === 429 || status >= 500) && attempt < maxRetries) {
+            // Exponential backoff with jitter: 3s base for 429, 2s for 5xx
+            const baseDelay = status === 429 ? 3000 : 2000;
+            const delay = baseDelay * Math.pow(2, attempt - 1);
+            const jitter = Math.floor(Math.random() * 1000);
+            console.log(`[ai] Retrying in ${delay + jitter}ms (status ${status})...`);
+            await new Promise(r => setTimeout(r, delay + jitter));
+            continue;
+          }
+
+          if (status >= 500 && targetModel === aiConfig.model) {
+            console.log(`[ai] Primary model overloaded, trying fallback: ${FALLBACK_MODEL}`);
+            try {
+              return await callNvidiaDirect(messages, maxTokens, timeoutMs, FALLBACK_MODEL);
+            } catch (fallbackErr) {
+              console.error('[ai] Fallback also failed:', fallbackErr.message);
+            }
+          }
+
+          if (status === 401) throw createAIError('AI service authentication failed. Please check your API key.', 401, { isAuthError: true });
+          if (status === 429) throw createAIError('AI rate limit exceeded. Please wait a minute and try again.', 429, { isRateLimitError: true });
+          if (status === 503) throw createAIError('AI service is temporarily overloaded. Please try again shortly.', 503, { isServiceUnavailable: true });
+          if (status >= 500) throw createAIError('AI service is temporarily unavailable. Please try again.', status, { isServiceUnavailable: true });
+          throw createAIError(`AI service error (${status}). Please try again.`, status);
         }
-      }
 
-      if (res.status === 401) throw new Error('AI service authentication failed. Please check your API key.');
-      if (res.status === 429) throw new Error('AI rate limit exceeded. Please wait a minute and try again.');
-      if (res.status === 503) throw new Error('AI service is temporarily overloaded. Please try again shortly.');
-      if (res.status >= 500) throw new Error('AI service is temporarily unavailable. Please try again.');
-      throw new Error(`AI service error (${res.status}). Please try again.`);
+        if (err?.name === 'AbortError' || err?.code === 'ABORT_ERR' || err?.code === 'UND_ERR_ABORTED' || err?.name === 'TimeoutError' || err?.name === 'APIUserAbortError') {
+          console.error(`[ai] ${targetModel} request timed out on attempt ${attempt}/${maxRetries}`);
+        } else {
+          console.error(`[ai] ${targetModel} error on attempt ${attempt}/${maxRetries}:`, err?.message || err);
+        }
+
+        errorTracker.addBreadcrumb('ai', `${targetModel} error`, {
+          model: targetModel,
+          status: err?.status ?? err?.response?.status,
+          attempt,
+        });
+
+        if (err?.status) {
+          throw err;
+        }
+
+        throw createAIError(err?.message || 'AI service error. Please try again.', err?.status || 500);
+      }
     }
   });
 }
@@ -112,38 +137,24 @@ async function callNvidia(messages, maxTokens = 2048, timeoutMs = 60_000, model 
 async function callNvidiaDirect(messages, maxTokens = 2048, timeoutMs = 60_000, model) {
   const targetModel = model;
 
-  for (let attempt = 1; attempt <= 1; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const completion = await aiClient.chat.completions.create({
+      model: targetModel,
+      messages,
+      temperature: 0.3,
+      max_tokens: maxTokens,
+      top_p: 0.95,
+      stream: false,
+      chat_template_kwargs: { enable_thinking: false },
+    }, {
+      timeout: timeoutMs,
+    });
 
-    let res;
-    try {
-      res = await fetch(`${env.NVIDIA_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${env.NVIDIA_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: targetModel,
-          messages,
-          temperature: 0.3,
-          max_tokens: maxTokens,
-        }),
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (res.ok) {
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? '';
-    }
-
-    const body = await res.text();
-    console.error(`[ai] NVIDIA ${targetModel} error ${res.status}:`, body.substring(0, 200));
-    throw new Error(`AI fallback service error (${res.status})`);
+    return completion.choices?.[0]?.message?.content || '';
+  } catch (err) {
+    const status = err?.status ?? err?.response?.status;
+    console.error(`[ai] ${targetModel} fallback error ${status || 'unknown'}:`, err?.message || err);
+    throw createAIError(`AI fallback service error (${status || 'unknown'})`, status || 500, { isServiceUnavailable: true });
   }
 }
 
@@ -300,6 +311,178 @@ function calculateKeywordMatch(jobDescription, resumeText) {
   return Math.max(10, Math.min(95, score)); // Cap at 95 to avoid false perfect scores
 }
 
+function extractTopKeywords(text, limit = 10) {
+  if (!text || typeof text !== 'string') return [];
+
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+    'as', 'is', 'was', 'are', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'this', 'that',
+    'these', 'those', 'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'him', 'his', 'she',
+    'her', 'it', 'its', 'they', 'them', 'their', 'what', 'which', 'who', 'whom', 'when', 'where',
+    'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such',
+    'no', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'about', 'above',
+    'after', 'again', 'also', 'am', 'any', 'because', 'before', 'being', 'below', 'between',
+    'during', 'from', 'further', 'get', 'got', 'having', 'here', 'into', 'let', 'like', 'make',
+    'many', 'need', 'new', 'now', 'old', 'one', 'out', 'over', 'per', 'put', 'see', 'set', 'since',
+    'still', 'take', 'then', 'there', 'think', 'through', 'under', 'until', 'up', 'use', 'via',
+    'way', 'well', 'work', 'yet'
+  ]);
+
+  const words = text.toLowerCase()
+    .replace(/[^a-z0-9\s\-\.]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+
+  return [...new Set(words)].slice(0, limit);
+}
+
+function calculateExperienceMatch(jobDescription, resumeText) {
+  const yearsPattern = /(\d{1,2})\+?\s*(?:\+?\s*)?years?(?:\s+of)?(?:\s+relevant)?\s+experience?/gi;
+  const jdYears = [...jobDescription.matchAll(yearsPattern)].map(match => Number(match[1])).filter(Boolean);
+  const resumeYears = [...resumeText.matchAll(yearsPattern)].map(match => Number(match[1])).filter(Boolean);
+
+  const required = jdYears.length > 0 ? Math.max(...jdYears) : 0;
+  const offered = resumeYears.length > 0 ? Math.max(...resumeYears) : 0;
+
+  if (!required && !offered) return 60;
+  if (!required) return offered >= 5 ? 80 : 65;
+  if (!offered) return 40;
+
+  if (offered >= required + 3) return 95;
+  if (offered >= required) return 85;
+
+  const ratio = offered / required;
+  return Math.max(20, Math.round(35 + (ratio * 50)));
+}
+
+function calculateEducationMatch(jobDescription, resumeText) {
+  const rankByDegree = [
+    { pattern: /ph\.?\s*d|doctorate|doctoral/i, rank: 4 },
+    { pattern: /master|m\.?\s*s|m\.?\s*a|mba/i, rank: 3 },
+    { pattern: /bachelor|b\.?\s*s|b\.?\s*a|undergraduate/i, rank: 2 },
+    { pattern: /associate/i, rank: 1 },
+    { pattern: /high school|secondary/i, rank: 0 },
+  ];
+
+  const detectRank = (text) => {
+    let rank = -1;
+    for (const { pattern, rank: value } of rankByDegree) {
+      if (pattern.test(text)) {
+        rank = Math.max(rank, value);
+      }
+    }
+    return rank;
+  };
+
+  const required = detectRank(jobDescription);
+  const offered = detectRank(resumeText);
+
+  if (required < 0 && offered < 0) return 55;
+  if (required < 0) return offered >= 2 ? 70 : 60;
+  if (offered < 0) return 35;
+  if (offered >= required) return 90;
+
+  const gap = required - offered;
+  return Math.max(25, 90 - (gap * 20));
+}
+
+function calculateSkillsMatch(jobDescription, resumeText) {
+  const jdKeywords = extractTopKeywords(jobDescription, 25);
+  const resumeLower = resumeText.toLowerCase();
+
+  if (jdKeywords.length === 0) return 55;
+
+  let found = 0;
+  for (const keyword of jdKeywords) {
+    if (resumeLower.includes(keyword)) found++;
+  }
+
+  const skillPatterns = [
+    /javascript|js\b/i, /typescript|ts\b/i, /python/i, /java\b/i,
+    /react/i, /angular/i, /vue/i, /node\.?js/i, /express/i,
+    /sql/i, /nosql/i, /mongodb|postgres|mysql|oracle/i,
+    /aws|azure|gcp|google cloud/i, /docker|kubernetes|k8s/i,
+    /git/i, /agile|scrum/i, /ci\/cd/i, /devops/i,
+    /html/i, /css/i, /rest|api/i, /graphql/i,
+    /machine learning|ml|ai|artificial intelligence/i,
+    /data analysis|analytics/i, /project management/i,
+    /leadership/i, /communication/i, /team/i, /collaboration/i,
+  ];
+
+  let skillMatches = 0;
+  for (const pattern of skillPatterns) {
+    if (pattern.test(jobDescription) && pattern.test(resumeText)) {
+      skillMatches++;
+    }
+  }
+
+  const keywordCoverage = (found / jdKeywords.length) * 100;
+  const skillCoverage = (skillMatches / Math.min(skillPatterns.length, 6)) * 100;
+  const score = Math.round((keywordCoverage * 0.55) + (skillCoverage * 0.45));
+
+  return Math.max(10, Math.min(95, score));
+}
+
+function buildFallbackAnalysis(jobDescription, resumeText, reason = 'AI response could not be parsed') {
+  const keywordMatch = calculateKeywordMatch(jobDescription, resumeText);
+  const skillsMatch = calculateSkillsMatch(jobDescription, resumeText);
+  const experienceMatch = calculateExperienceMatch(jobDescription, resumeText);
+  const educationMatch = calculateEducationMatch(jobDescription, resumeText);
+
+  const atsScore = Math.round(
+    (skillsMatch * 0.35) +
+    (experienceMatch * 0.30) +
+    (keywordMatch * 0.20) +
+    (educationMatch * 0.15)
+  );
+
+  const topKeywords = extractTopKeywords(jobDescription, 5);
+  const questions = topKeywords.length > 0
+    ? topKeywords.map((keyword) => `Can you describe your experience with ${keyword}?`)
+    : [];
+
+  while (questions.length < 10) {
+    const fallbackQuestions = [
+      'Tell me about the most relevant project on your resume for this role.',
+      'How have you applied your strongest technical skills in recent work?',
+      'What is a challenge you solved that is similar to this job?',
+      'How do you keep your skills current?',
+      'How do you collaborate with teammates when requirements change?',
+      'What part of this role would you ramp up on first?',
+      'Describe a time you had to learn a new tool quickly.',
+      'How do you prioritize work when several tasks are urgent?',
+      'What accomplishment best demonstrates your fit for this role?',
+      'What would you want to clarify about this position before joining?'
+    ];
+    questions.push(fallbackQuestions[questions.length]);
+  }
+
+  const recommendation = atsScore >= 75 ? 'apply' : atsScore >= 50 ? 'tailor' : 'skip';
+
+  return {
+    ats_score: atsScore,
+    score_breakdown: {
+      skills_match: skillsMatch,
+      experience_match: experienceMatch,
+      education_match: educationMatch,
+      keyword_match: keywordMatch,
+    },
+    recommendation,
+    rationale: `${reason}. This fallback score was generated from deterministic text analysis, so you can still review a useful result.`,
+    interview_questions: questions.slice(0, 10),
+  };
+}
+
+function isParseableAnalysisError(error) {
+  if (!error) return false;
+  const message = String(error.message || error);
+  return (
+    error instanceof SyntaxError ||
+    /invalid json|unparseable response|no json found|missing valid ats_score|invalid score|return valid json/i.test(message)
+  );
+}
+
 // ─── Call 1: Fast — score, breakdown, rationale, questions ───────────────
 export async function analyzeScore({ jobDescription, resumeText }) {
   const sanitizedJD = sanitizeForAI(jobDescription, 'jobDescription');
@@ -329,6 +512,8 @@ JSON: {"ats_score":N,"score_breakdown":{"skills_match":N,"experience_match":N,"e
   console.log(`[ai] Score analysis: estimated prompt tokens=${estimateTokens(systemPrompt) + estimateTokens(userPrompt)}, max_tokens=${maxTokens}`);
 
   let result;
+  let lastParseError = null;
+  let lastServiceError = null;
   let attempts = 0;
   const maxAttempts = 3;
   
@@ -339,18 +524,36 @@ JSON: {"ats_score":N,"score_breakdown":{"skills_match":N,"experience_match":N,"e
     try {
       const raw = await callNvidia(messages, maxTokens, 60_000);
       result = extractJSON(raw);
+      if (!result || typeof result !== 'object') {
+        throw new Error('AI returned an empty analysis response.');
+      }
       break;
     } catch (e) {
       console.error(`[ai] Attempt ${attempts} failed:`, e.message);
-      if (attempts >= maxAttempts) {
-        throw new Error('AI failed to return valid JSON after multiple attempts. Please try again.');
+      if (isParseableAnalysisError(e)) {
+        lastParseError = e;
+        if (attempts >= maxAttempts) {
+          const fallback = buildFallbackAnalysis(
+            jobDescription,
+            resumeText,
+            lastParseError?.message || 'AI response could not be parsed'
+          );
+          console.warn('[ai] Falling back to deterministic analysis:', fallback.rationale);
+          return fallback;
+        }
+      } else {
+        lastServiceError = e;
+        if (attempts >= maxAttempts) {
+          throw lastServiceError;
+        }
       }
       await new Promise(r => setTimeout(r, 1000));
     }
   }
 
   if (typeof result.ats_score !== 'number' || result.ats_score < 0 || result.ats_score > 100) {
-    throw new Error('AI returned an invalid score. Please try again.');
+    console.warn('[ai] Parsed response had an invalid score. Falling back to deterministic analysis.');
+    return buildFallbackAnalysis(jobDescription, resumeText, 'AI response had an invalid or missing score');
   }
 
   if (result.score_breakdown) {
@@ -595,7 +798,7 @@ export async function generateCoverLetter({ jobDescription, resumeText, rational
 export function getAIServiceHealth() {
   return {
     circuitBreaker: nvidiaCircuitBreaker.getMetrics(),
-    model: env.NVIDIA_MODEL,
+    model: aiConfig.model,
     fallbackModel: FALLBACK_MODEL,
   };
 }

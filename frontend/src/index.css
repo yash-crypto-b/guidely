@@ -38,3 +38,24 @@
   background-color: #111827;
   color: #f3f4f6;
 }
+
+/* Curved marquee text styling */
+.curved-marquee-text {
+  fill: #6b6e78;
+  font-size: 2.5rem !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 640px) {
+  .curved-marquee-text {
+    font-size: 3rem !important;
+  }
+}
+
+.curved-loop-svg {
+  overflow: visible;
+  display: block;
+  width: 100%;
+  aspect-ratio: 100 / 8;
+}

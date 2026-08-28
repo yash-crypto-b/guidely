@@ -39,9 +39,17 @@ const schema = z.object({
   SUPABASE_SECRET_KEY: z.string().min(1, 'SUPABASE_SECRET_KEY is required'),
   SUPABASE_JWT_SECRET: z.string().optional(),
 
-  NVIDIA_API_KEY: z.string().min(1, 'NVIDIA_API_KEY is required'),
-  NVIDIA_BASE_URL: z.string().url().default('https://integrate.api.nvidia.com/v1'),
-  NVIDIA_MODEL: z.string().min(1),
+  // NVIDIA API configuration (OpenAI-compatible endpoint).
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_MODEL: z.string().min(1).optional(),
+  NVIDIA_BASE_URL: z.string().optional(),
+
+  // Legacy aliases kept so existing local files do not break immediately.
+  GEMINI_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().min(1).optional(),
+  AI_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().min(1).optional(),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
@@ -77,10 +85,21 @@ const schema = z.object({
 // Clean all string env vars before validation (strip quotes, trailing slashes)
 const cleanedEnv = {};
 for (const [key, value] of Object.entries(process.env)) {
-  cleanedEnv[key] = typeof value === 'string' ? clean(value) : value;
+  const cleaned = typeof value === 'string' ? clean(value) : value;
+  // Treat empty strings as undefined so optional() fields pass validation
+  cleanedEnv[key] = cleaned === '' ? undefined : cleaned;
 }
 
-const parsed = schema.safeParse(cleanedEnv);
+const parsed = schema.superRefine((data, ctx) => {
+  const apiKey = data.NVIDIA_API_KEY || data.GEMINI_API_KEY || data.GOOGLE_API_KEY || data.AI_API_KEY;
+  if (!apiKey) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['NVIDIA_API_KEY'],
+      message: 'NVIDIA_API_KEY (or GEMINI_API_KEY / GOOGLE_API_KEY / AI_API_KEY) is required',
+    });
+  }
+}).safeParse(cleanedEnv);
 
 if (!parsed.success) {
   // Print which keys are wrong — but never their values (may be secret).
@@ -89,9 +108,14 @@ if (!parsed.success) {
     .join('\n');
   console.error(`\n[env] Invalid environment configuration:\n${issues}\n`);
   console.error('Set these as environment variables in your hosting dashboard (Render/Vercel/etc).\n');
-  console.error('Required variables: PORT, NODE_ENV, FRONTEND_ORIGIN, SUPABASE_URL, SUPABASE_SECRET_KEY, NVIDIA_API_KEY\n');
+  console.error('Required variables: PORT, NODE_ENV, FRONTEND_ORIGIN, SUPABASE_URL, SUPABASE_SECRET_KEY, NVIDIA_API_KEY (or GEMINI_API_KEY / GOOGLE_API_KEY / AI_API_KEY)\n');
   process.exit(1);
 }
 
 export const env = parsed.data;
 export const isProd = env.NODE_ENV === 'production';
+export const aiConfig = {
+  apiKey: env.NVIDIA_API_KEY || env.GEMINI_API_KEY || env.GOOGLE_API_KEY || env.AI_API_KEY,
+  model: env.NVIDIA_MODEL || env.AI_MODEL || env.GEMINI_MODEL || 'deepseek-ai/deepseek-v4-pro-0813',
+  baseUrl: env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+};

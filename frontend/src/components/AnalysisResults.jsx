@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ResumeComparison } from '@/components/ResumeComparison';
+import { getApiBase } from '@/lib/api';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://guidely-1.onrender.com';
+const API_BASE = getApiBase();
 
 const recommendationConfig = {
   apply: { label: 'Strong Match', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-700' },
@@ -84,9 +85,10 @@ function Toast({ message, type, onClose }) {
   );
 }
 
-export function AnalysisResults({ result, onReset, cvLoading, cvError, coverLetterLoading, coverLetterError }) {
+export function AnalysisResults({ result, onReset, cvLoading, cvError, coverLetterLoading, coverLetterError, onRetryCV, onRetryCoverLetter }) {
   const { ats_score, score_breakdown, recommendation, rationale, custom_cv, cover_letter, interview_questions, _meta } = result;
-  const originalResume = _meta?.resumeText || '';
+  const rawResume = _meta?.resumeText || '';
+  const originalResume = rawResume === '[PDF_UPLOADED]' ? '' : rawResume;
   const [copied, setCopied] = useState(false);
   const [copiedCoverLetter, setCopiedCoverLetter] = useState(false);
   const [toast, setToast] = useState(null);
@@ -222,6 +224,12 @@ export function AnalysisResults({ result, onReset, cvLoading, cvError, coverLett
       ) : cvError ? (
         <div className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-xl p-6">
           <p className="text-sm text-amber-600 dark:text-amber-400">{cvError}</p>
+          {onRetryCV && (
+            <button onClick={onRetryCV} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Retry
+            </button>
+          )}
         </div>
       ) : custom_cv ? (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
@@ -288,6 +296,12 @@ export function AnalysisResults({ result, onReset, cvLoading, cvError, coverLett
       ) : coverLetterError ? (
         <div className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700 rounded-xl p-6">
           <p className="text-sm text-amber-600 dark:text-amber-400">{coverLetterError}</p>
+          {onRetryCoverLetter && (
+            <button onClick={onRetryCoverLetter} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              Retry
+            </button>
+          )}
         </div>
       ) : cover_letter ? (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">

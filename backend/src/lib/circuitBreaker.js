@@ -1,6 +1,6 @@
 /**
  * Circuit Breaker Pattern
- * Prevents cascading failures when external services (NVIDIA API) are down.
+ * Prevents cascading failures when external services (Gemini API) are down.
  * 
  * States:
  * - CLOSED: Normal operation, requests flow through
@@ -113,6 +113,11 @@ export class CircuitBreaker {
       this.onSuccess();
       return result;
     } catch (error) {
+      // Authentication errors should not trip the circuit breaker.
+      if (error?.isAuthError || error?.status === 401 || error?.status === 403) {
+        this.metrics.failedCalls++;
+        throw error;
+      }
       this.onFailure(error);
       throw error;
     }
@@ -186,9 +191,9 @@ export class CircuitBreakerError extends Error {
   }
 }
 
-// Create a singleton circuit breaker for NVIDIA API
+// Create a singleton circuit breaker for Gemini API
 export const nvidiaCircuitBreaker = new CircuitBreaker({
-  name: 'nvidia-api',
+  name: 'gemini-api',
   failureThreshold: 5,        // Open after 5 consecutive failures
   resetTimeoutMs: 60_000,     // Try again after 1 minute
   halfOpenMaxCalls: 3,        // Allow 3 test calls in half-open

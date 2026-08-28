@@ -3,6 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { supabase, isConfigured } from '@/lib/supabase';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Home } from '@/components/Home';
+import { ConnectPage } from '@/components/ConnectPage';
+import { ProfilePage } from '@/components/ProfilePage';
+import { DashboardLayout } from '@/components/DashboardLayout';
 import { ThemeProvider } from '@/lib/ThemeContext';
 import { LandingPage } from '@/components/LandingPage';
 import { PrivacyPolicy } from '@/components/PrivacyPolicy';
@@ -53,10 +56,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!isConfigured) {
-    return <ConfigError />;
-  }
-
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-gray-100 dark:bg-gray-900">
@@ -78,11 +77,11 @@ export default function App() {
           } />
           
           <Route path="/login" element={
-            session ? <Navigate to="/dashboard" replace /> : <AuthScreen />
+            !isConfigured ? <ConfigError /> : session ? <Navigate to="/dashboard" replace /> : <AuthScreen />
           } />
           
           <Route path="/signup" element={
-            session ? <Navigate to="/dashboard" replace /> : <AuthScreen />
+            !isConfigured ? <ConfigError /> : session ? <Navigate to="/dashboard" replace /> : <AuthScreen />
           } />
           
           <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -92,7 +91,13 @@ export default function App() {
           
           {/* Protected Routes - require auth */}
           <Route path="/dashboard" element={
-            session ? <Home user={session.user} /> : <Navigate to="/login" replace />
+            !isConfigured ? <ConfigError /> : session ? <DashboardLayout user={session.user}><Home user={session.user} /></DashboardLayout> : <Navigate to="/login" replace />
+          } />
+          <Route path="/connect" element={
+            !isConfigured ? <ConfigError /> : session ? <DashboardLayout user={session.user}><ConnectPage user={session.user} /></DashboardLayout> : <Navigate to="/login" replace />
+          } />
+          <Route path="/profile" element={
+            !isConfigured ? <ConfigError /> : session ? <DashboardLayout user={session.user}><ProfilePage user={session.user} /></DashboardLayout> : <Navigate to="/login" replace />
           } />
           
           {/* Fallback - redirect to home */}

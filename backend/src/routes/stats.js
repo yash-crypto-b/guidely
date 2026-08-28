@@ -6,6 +6,28 @@ import { getCacheStats } from '../lib/cache.js';
 
 export const statsRouter = Router();
 
+// In-memory history per user (resets on server restart)
+const userHistory = new Map();
+
+export function recordAnalysis(userId, entry) {
+  if (!userId) return;
+  if (!userHistory.has(userId)) userHistory.set(userId, []);
+  const list = userHistory.get(userId);
+  list.unshift(entry);
+  if (list.length > 50) list.length = 50; // keep last 50
+}
+
+// GET /api/stats/history — Get user's analysis history
+statsRouter.get('/history', requireAuth, async (req, res) => {
+  try {
+    const history = userHistory.get(req.user.id) || [];
+    res.json({ history });
+  } catch (err) {
+    console.error('[stats] History error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch history' });
+  }
+});
+
 // GET /api/stats — Get analytics summary
 statsRouter.get('/', requireAuth, async (req, res) => {
   try {

@@ -14,6 +14,7 @@ import { requireUserRateLimit } from '../middleware/userRateLimit.js';
 import { analyzeScore, generateCustomCV, generateCoverLetter } from '../lib/ai.js';
 import { getCachedResult, setCachedResult, getCacheStats, clearCache } from '../lib/cache.js';
 import { validateTextQuality, validateFile, validatePdfPages, validateAnalysisInput, truncateToTokenBudget, TextValidationError, FileValidationError } from '../lib/validators.js';
+import { recordAnalysis } from './stats.js';
 import {
   logAnalysisComplete,
   logAnalysisFailed,
@@ -351,7 +352,7 @@ analysisRouter.post('/',
       if (cached) {
         console.log('[analysis] Cache hit');
         await logCacheHit({ userId: req.user?.id, key: 'analysis' });
-        return res.json({ ...cached, cached: true });
+        return res.json({ ...cached, cached: true, parsedResumeText: truncatedResume });
       }
 
       await logCacheMiss({ userId: req.user?.id, key: 'analysis' });
@@ -379,6 +380,14 @@ analysisRouter.post('/',
         result,
         durationMs,
         cached: false,
+      });
+
+      // Record in user history
+      recordAnalysis(req.user?.id, {
+        score: result.ats_score,
+        recommendation: result.recommendation,
+        job_title: jd.substring(0, 80),
+        created_at: new Date().toISOString(),
       });
 
       res.json({ ...result, cached: false, parsedResumeText: truncatedResume });
