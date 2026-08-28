@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/lib/ThemeContext';
 
 export function AuthScreen() {
   const [mode, setMode] = useState('signin');
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -127,6 +130,71 @@ export function AuthScreen() {
                   </div>
                 )}
 
+                {forgotMode ? (
+                  <div className="mt-6">
+                    {forgotSuccess ? (
+                      <div className="text-center py-4">
+                        <div className="text-3xl mb-3">📧</div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-[#f7f2ed]">Check your email</p>
+                        <p className="text-sm text-gray-500 dark:text-[#b8b5bd] mt-1">
+                          We sent a password reset link to <strong className="text-gray-900 dark:text-[#f7f2ed]">{forgotEmail}</strong>.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setForgotMode(false); setForgotSuccess(false); }}
+                          className="mt-4 text-sm font-medium text-[#f575ad] hover:underline"
+                        >
+                          Back to sign in
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-500 dark:text-[#b8b5bd] mb-4">
+                          Enter your email and we'll send you a link to reset your password.
+                        </p>
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          setBusy(true);
+                          setError('');
+                          try {
+                            const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                              redirectTo: `${window.location.origin}/reset-password`,
+                            });
+                            if (error) setError(error.message);
+                            else setForgotSuccess(true);
+                          } catch {
+                            setError('Failed to send reset email. Please try again.');
+                          } finally {
+                            setBusy(false);
+                          }
+                        }} className="space-y-4">
+                          <input
+                            type="email"
+                            required
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="name@company.com"
+                            className="w-full rounded-xl border border-gray-200 dark:border-white/8 bg-gray-50 dark:bg-[rgba(40,47,66,0.95)] px-4 py-3 text-sm text-gray-900 dark:text-[#f7f2ed] placeholder:text-gray-400 dark:placeholder:text-[#8f93a1] outline-none transition-colors focus:border-[#f575ad]/60 focus:ring-2 focus:ring-[#f575ad]/25"
+                          />
+                          <button
+                            type="submit"
+                            disabled={busy}
+                            className="w-full rounded-xl bg-[#f575ad] py-3.5 text-sm font-semibold text-[#0f1217] shadow-[0_16px_30px_rgba(242,125,184,0.28)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {busy ? 'Sending…' : 'Send reset link'}
+                          </button>
+                        </form>
+                        <button
+                          type="button"
+                          onClick={() => setForgotMode(false)}
+                          className="mt-4 w-full text-center text-sm font-medium text-[#f575ad] hover:underline"
+                        >
+                          Back to sign in
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
                 <form onSubmit={onSubmit} className="mt-6 space-y-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-[#d7d4db]">
@@ -151,6 +219,7 @@ export function AuthScreen() {
                       {mode === 'signin' && (
                         <button
                           type="button"
+                          onClick={() => { setForgotMode(true); setForgotEmail(email); setError(''); }}
                           className="text-xs font-medium text-[#f575ad] hover:underline"
                         >
                           Forgot password?
@@ -194,7 +263,9 @@ export function AuthScreen() {
                     {busy ? 'Please wait…' : isSignup ? 'Create Account' : 'Sign In'}
                   </button>
                 </form>
+                )}
 
+                {!forgotMode && (
                 <p className="mt-6 text-center text-sm text-gray-500 dark:text-[#b8b5bd]">
                   {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
                   <button
@@ -205,9 +276,19 @@ export function AuthScreen() {
                     {isSignup ? 'Sign In' : 'Create one'}
                   </button>
                 </p>
+                )}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Footer links */}
+      <div className="relative z-10 pb-6 text-center">
+        <div className="flex items-center justify-center gap-4 text-xs text-gray-400 dark:text-[#6b6e78]">
+          <Link to="/privacy" className="hover:text-gray-600 dark:hover:text-[#b8b5bd] transition-colors">Privacy</Link>
+          <Link to="/terms" className="hover:text-gray-600 dark:hover:text-[#b8b5bd] transition-colors">Terms</Link>
+          <Link to="/support" className="hover:text-gray-600 dark:hover:text-[#b8b5bd] transition-colors">Support</Link>
         </div>
       </div>
     </div>

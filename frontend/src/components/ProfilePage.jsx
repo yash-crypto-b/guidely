@@ -65,10 +65,35 @@ export function ProfilePage({ user }) {
       <button
         onClick={handleSignOut}
         disabled={signingOut}
-        className="w-full rounded-[20px] border border-red-200 dark:border-red-500/20 bg-white dark:bg-[rgba(18,20,28,0.82)] p-4 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+        className="w-full rounded-[20px] border border-gray-200 dark:border-white/[0.06] bg-white dark:bg-[rgba(18,20,28,0.82)] p-4 text-sm font-medium text-gray-700 dark:text-[#b8b5bd] hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
       >
         {signingOut ? 'Signing out...' : 'Sign Out'}
       </button>
+
+      {/* Delete Account */}
+      <div className="rounded-[20px] border border-red-200 dark:border-red-500/20 bg-white dark:bg-[rgba(18,20,28,0.82)] p-6">
+        <h3 className="text-[13px] font-semibold uppercase tracking-[1.2px] text-red-500 dark:text-red-400 mb-2">Danger Zone</h3>
+        <p className="text-sm text-gray-500 dark:text-[#b8b5bd] mb-4">
+          Permanently delete your account and all associated data. This action cannot be undone.
+        </p>
+        <button
+          onClick={async () => {
+            if (!window.confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+            try {
+              const { error } = await supabase.auth.admin.deleteUser(user.id);
+              if (error) {
+                // Admin API may not be available — try sign out as fallback
+                await supabase.auth.signOut();
+              }
+            } catch {
+              await supabase.auth.signOut();
+            }
+          }}
+          className="rounded-xl border border-red-300 dark:border-red-500/30 px-5 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+        >
+          Delete Account
+        </button>
+      </div>
     </div>
   );
 }

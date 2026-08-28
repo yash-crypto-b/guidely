@@ -177,18 +177,35 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* ── Disclaimer ──────────────────────────────── */}
+        <section className="border-t border-white/[0.04]">
+          <div className="mx-auto max-w-5xl px-6 py-12 text-center">
+            <p className="text-xs text-[#6b6e78] leading-relaxed max-w-lg mx-auto">
+              ATS scores are informational estimates based on AI analysis. They are not guarantees of how any specific ATS or employer will evaluate your resume. Always verify AI-generated content before using it in applications.
+            </p>
+          </div>
+        </section>
+
         {/* ── Footer ───────────────────────────────────── */}
         <footer className="border-t border-white/[0.04]">
-          <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <svg className="h-6 w-6" viewBox="0 0 36 36" fill="none">
-                <rect x="1" y="1" width="34" height="34" rx="10" stroke="#f27db8" strokeWidth="1.5" fill="rgba(31,31,46,0.92)" />
-                <path d="M18 9C13.03 9 9 13.03 9 18s4.03 9 9 9c3.14 0 5.88-1.61 7.48-4.05" stroke="#f27db8" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-                <circle cx="23" cy="13" r="2" fill="#f27db8" />
-              </svg>
-              <span className="text-sm font-bold tracking-tight">guidely</span>
-            </Link>
-            <p className="text-xs text-[#6b6e78]">© 2026 Guidely</p>
+          <div className="mx-auto max-w-5xl px-6 py-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <Link to="/" className="flex items-center gap-2">
+                <svg className="h-6 w-6" viewBox="0 0 36 36" fill="none">
+                  <rect x="1" y="1" width="34" height="34" rx="10" stroke="#f27db8" strokeWidth="1.5" fill="rgba(31,31,46,0.92)" />
+                  <path d="M18 9C13.03 9 9 13.03 9 18s4.03 9 9 9c3.14 0 5.88-1.61 7.48-4.05" stroke="#f27db8" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                  <circle cx="23" cy="13" r="2" fill="#f27db8" />
+                </svg>
+                <span className="text-sm font-bold tracking-tight">guidely</span>
+              </Link>
+              <div className="flex items-center gap-4 text-xs text-[#6b6e78]">
+                <Link to="/privacy" className="hover:text-[#b8b5bd] transition-colors">Privacy</Link>
+                <Link to="/terms" className="hover:text-[#b8b5bd] transition-colors">Terms</Link>
+                <Link to="/support" className="hover:text-[#b8b5bd] transition-colors">Support</Link>
+                <Link to="/about" className="hover:text-[#b8b5bd] transition-colors">About</Link>
+              </div>
+              <p className="text-xs text-[#6b6e78]">© 2026 Guidely</p>
+            </div>
           </div>
         </footer>
       </div>
