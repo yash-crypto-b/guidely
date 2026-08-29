@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { SEO } from './SEO';
+import MoltenMetal from './MoltenMetal';
 
 const steps = [
   {
@@ -32,9 +33,31 @@ export function LandingPage() {
       <div className="min-h-screen bg-[#080a12] text-[#f7f2ed]">
         {/* ── Hero ─────────────────────────────────────── */}
         <section className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(114,33,70,0.4),transparent_50%)]" />
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <MoltenMetal
+              color1="#1a0a14"
+              color2="#f575ad"
+              color3="#f27db8"
+              speed={0.12}
+              scale={5}
+              detail={4}
+              glow={1.2}
+              coreSize={0.08}
+              swirl={0.8}
+              fold={-0.15}
+              blackPoint={0.2}
+              brightness={0.6}
+              colorMode="molten"
+              grain={true}
+              grainIntensity={0.03}
+              mouseInteraction={true}
+              mouseStrength={0.15}
+              opacity={0.35}
+            />
+          </div>
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_20%_0%,rgba(114,33,70,0.4),transparent_50%)]" />
 
-          <div className="relative mx-auto max-w-5xl px-6 pt-20 pb-24 sm:pt-28 sm:pb-32">
+          <div className="relative z-[2] mx-auto max-w-5xl px-6 pt-20 pb-24 sm:pt-28 sm:pb-32">
             {/* Nav */}
             <nav className="flex items-center justify-between mb-20 sm:mb-28">
               <Link to="/" className="flex items-center gap-2.5">
