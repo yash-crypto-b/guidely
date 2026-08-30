@@ -1,11 +1,11 @@
 services:
-  # Backend API
+  # Backend API (TypeScript — apps/backend)
   - type: web
     name: guidely-backend
     runtime: node
-    rootDir: backend
-    buildCommand: npm install --legacy-peer-deps
-    startCommand: node src/index.js
+    rootDir: apps/backend
+    buildCommand: npm install && npx prisma generate && npx tsc
+    startCommand: node dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -14,9 +14,8 @@ services:
       - key: FRONTEND_ORIGIN
         value: https://guidely-t9qi-ddhyp2qvl-yash-crypto-bs-projects.vercel.app
       # These must be set in the Render dashboard (Settings > Environment):
-      # - SUPABASE_URL
-      # - SUPABASE_SECRET_KEY
-      # - NVIDIA_API_KEY
-      # - NVIDIA_MODEL (default: nvidia/nemotron-3-nano-30b-a3b)
-      # - NVIDIA_BASE_URL (default: https://integrate.api.nvidia.com/v1)
+      # - DATABASE_URL (PostgreSQL connection string)
+      # - JWT_SECRET
+      # - STRIPE_SECRET_KEY
+      # - STRIPE_WEBHOOK_SECRET
     healthCheckPath: /health
