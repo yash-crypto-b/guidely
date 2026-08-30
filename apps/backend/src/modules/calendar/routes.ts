@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { sendSuccess } from '../../common/response';
 import * as calendarService from './service';
+import prisma from '../../db';
 
 const router = Router();
 
@@ -35,9 +36,6 @@ router.get('/feed.ics', authenticate, async (req: Request, res: Response, next: 
 
 router.get('/booking/:id/google', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
-
     const booking = await prisma.booking.findUnique({
       where: { id: req.params.id },
       include: {
