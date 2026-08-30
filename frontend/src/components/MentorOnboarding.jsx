@@ -158,7 +158,8 @@ export function MentorOnboarding({ user, onComplete, onClose }) {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || err.message || 'Failed to save profile');
+        const detail = err.details ? ` (${err.details})` : '';
+        throw new Error(`${err.error || err.message || 'Failed to save profile'}${detail}`);
       }
 
       // Create services separately

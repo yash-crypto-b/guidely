@@ -94,65 +94,43 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
 
     console.log(`[PUT /profile] user=${userId} fields=${Object.keys(req.body).join(',')}`);
 
-    // Ensure a users row exists — Supabase Auth creates auth.users but not
-    // necessarily public.users.  Upsert so first-time onboarding works.
-    let { data: currentUser } = await supabaseAdmin
+    // ── Build profile data ──────────────────────────────────────────
+    const meta = req.user?.user_metadata || {};
+    const profileData = {
+      id: userId,
+      email: req.user?.email || '',
+      name: meta.full_name || meta.name || req.user?.email?.split('@')[0] || 'User',
+    };
+    if (headline !== undefined) profileData.headline = headline;
+    if (bio !== undefined) profileData.bio = bio;
+    if (company !== undefined) profileData.company = company;
+    if (industry !== undefined) profileData.industry = industry;
+    if (location !== undefined) profileData.location = location;
+    if (yearsExperience !== undefined) profileData.years_experience = yearsExperience;
+    if (languages !== undefined) profileData.languages = languages;
+    if (linkedInUrl !== undefined) profileData.linkedin_url = linkedInUrl;
+    if (portfolioUrl !== undefined) profileData.portfolio_url = portfolioUrl;
+    if (hourlyRate !== undefined) profileData.hourly_rate = hourlyRate;
+    if (resumeUrl !== undefined) profileData.resume_url = resumeUrl;
+
+    // Check current role to decide promotion
+    const { data: currentUser } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', userId)
       .maybeSingle();
-
-    if (!currentUser) {
-      // Auto-create from Supabase auth metadata via upsert.
-      const meta = req.user?.user_metadata || {};
-      const { error: upsertErr } = await supabaseAdmin
-        .from('users')
-        .upsert({
-          id: userId,
-          email: req.user?.email || '',
-          name: meta.full_name || meta.name || req.user?.email?.split('@')[0] || 'User',
-          role: 'STUDENT',
-        }, { onConflict: 'id' });
-
-      if (upsertErr) {
-        // Non-fatal: log and continue.  The update below will also fail
-        // if the row truly can't be created, giving us a 500 either way.
-        console.warn(`[PUT /profile] Could not auto-create users row for ${userId}:`, upsertErr.message);
-      }
-
-      // Re-fetch to get the role
-      const { data: refetched } = await supabaseAdmin
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle();
-      currentUser = refetched;
-    }
-
-    const updateData = {};
-    if (headline !== undefined) updateData.headline = headline;
-    if (bio !== undefined) updateData.bio = bio;
-    if (company !== undefined) updateData.company = company;
-    if (industry !== undefined) updateData.industry = industry;
-    if (location !== undefined) updateData.location = location;
-    if (yearsExperience !== undefined) updateData.years_experience = yearsExperience;
-    if (languages !== undefined) updateData.languages = languages;
-    if (linkedInUrl !== undefined) updateData.linkedin_url = linkedInUrl;
-    if (portfolioUrl !== undefined) updateData.portfolio_url = portfolioUrl;
-    if (hourlyRate !== undefined) updateData.hourly_rate = hourlyRate;
-    if (resumeUrl !== undefined) updateData.resume_url = resumeUrl;
     if (currentUser?.role === 'STUDENT') {
-      updateData.role = 'CREATOR';
+      profileData.role = 'CREATOR';
     }
 
-    const { error: updateError } = await supabaseAdmin
+    // Upsert: creates the row on first onboarding, updates on subsequent saves.
+    const { error: upsertError } = await supabaseAdmin
       .from('users')
-      .update(updateData)
-      .eq('id', userId);
+      .upsert(profileData, { onConflict: 'id' });
 
-    if (updateError) {
-      console.error(`[PUT /profile] User update failed for ${userId}:`, updateError);
-      return res.status(500).json({ error: 'Failed to update profile', details: updateError.message });
+    if (upsertError) {
+      console.error(`[PUT /profile] Upsert failed for ${userId}:`, JSON.stringify(upsertError));
+      return res.status(500).json({ error: 'Failed to update profile', details: upsertError.message });
     }
 
     // Update expertise tags
