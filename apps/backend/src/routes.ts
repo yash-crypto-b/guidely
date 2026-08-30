@@ -6,6 +6,7 @@ import messagingRoutes from './modules/messaging/routes';
 import videoRoutes from './modules/video/routes';
 import notificationRoutes from './modules/notifications/routes';
 import adminRoutes from './modules/admin/routes';
+import connectionsRoutes from './modules/connections/routes';
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use('/messages', messagingRoutes);
 router.use('/video', videoRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
+router.use('/connections', connectionsRoutes);
 
 export default router;

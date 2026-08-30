@@ -17,6 +17,7 @@ export function Navbar() {
               Guidely
             </Link>
             <div className="hidden md:flex ml-10 space-x-6">
+              <Link href="/connections" className="text-gray-600 hover:text-gray-900">Connections</Link>
               <Link href="/creators" className="text-gray-600 hover:text-gray-900">Explore</Link>
               {user?.role === 'CREATOR' && (
                 <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">Dashboard</Link>
@@ -29,6 +30,7 @@ export function Navbar() {
           <div className="flex items-center space-x-4">
             {user ? (
               <>
+                <Link href="/connections/my" className="hidden md:block text-gray-600 hover:text-gray-900">My Connections</Link>
                 <Link href="/bookings" className="text-gray-600 hover:text-gray-900">My Bookings</Link>
                 <div className="relative">
                   <button onClick={() => setMenuOpen(!menuOpen)} className="flex items-center space-x-2 text-sm">
@@ -38,8 +40,14 @@ export function Navbar() {
                     <span className="hidden md:block">{user.name}</span>
                   </button>
                   {menuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border py-1 z-50">
                       <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+                      <Link href="/connections/my" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>My Connections</Link>
+                      {(user.role === 'CREATOR' || user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
+                        <Link href="/connections/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>Mentor Dashboard</Link>
+                      )}
+                      <Link href="/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setMenuOpen(false)}>My Bookings</Link>
+                      <div className="border-t my-1" />
                       <button onClick={() => { logout(); setMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50">Logout</button>
                     </div>
                   )}

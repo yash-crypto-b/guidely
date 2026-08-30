@@ -27,6 +27,20 @@ enum SessionType {
   GROUP
 }
 
+enum AttributionSource {
+  DIRECT
+  MARKETPLACE
+}
+
+enum DeliveryType {
+  VIDEO_CALL
+  RESUME_REVIEW
+  MOCK_INTERVIEW
+  CAREER_GUIDANCE
+  ASYNC_MESSAGE
+  PORTFOLIO_REVIEW
+}
+
 model User {
   id             String   @id @default(uuid())
   email          String   @unique
@@ -44,6 +58,16 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // Enhanced mentor profile fields
+  company         String?
+  industry        String?
+  location        String?
+  yearsExperience Int?
+  languages       String[] @default([])
+  linkedInUrl     String?
+  portfolioUrl    String?
+  hourlyRate      Int?
+
   creatorTags    CreatorTag[]
   socialLinks    SocialLink[]
   availability   Availability[]
@@ -53,6 +77,8 @@ model User {
   reviewsGiven   Review[]       @relation("Reviewer")
   reviewsReceived Review[]      @relation("ReviewedCreator")
   messages       Message[]
+  savedByUsers   SavedMentor[] @relation("SavedByUser")
+  savedMentors   SavedMentor[] @relation("SavedMentorUser")
   stripeAccountId String?
   isActive       Boolean        @default(true)
 }
@@ -94,6 +120,11 @@ model SessionTypeDefinition {
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  // Connections service fields
+  deliveryType    DeliveryType @default(VIDEO_CALL)
+  maxBookingsPerDay Int?
+  availableDays   Int[]         @default([1, 2, 3, 4, 5]) // 0=Sun, 1=Mon, ..., 6=Sat
 
   creator     User        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   bookings    Booking[]
@@ -141,6 +172,11 @@ model Booking {
   cancelledBy      String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+
+  // Connections attribution and commission fields
+  attributionSource AttributionSource @default(MARKETPLACE)
+  commissionRate    Int               @default(20)  // percentage
+  bookingMetadata   String?           // mentee's "what would you like help with?"
 
   creator          User          @relation("CreatorBookings", fields: [creatorId], references: [id])
   student          User          @relation("StudentBookings", fields: [studentId], references: [id])
@@ -194,6 +230,18 @@ model Message {
 
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   sender    User     @relation(fields: [senderId], references: [id])
+}
+
+model SavedMentor {
+  id       String @id @default(uuid())
+  userId   String
+  mentorId String
+  savedAt  DateTime @default(now())
+
+  user   User @relation("SavedByUser", fields: [userId], references: [id], onDelete: Cascade)
+  mentor User @relation("SavedMentorUser", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mentorId])
 }
 
 model NotificationPreference {

@@ -1,8 +1,7 @@
 import prisma from '../../db';
 import { NotFoundError, ForbiddenError, ValidationError } from '../../common/errors';
 import { CreateBookingInput, UpdateBookingStatusInput, CreateReviewInput } from './schemas';
-import { BookingStatus } from '@prisma/client';
-import { getRedis } from '../../db/redis';
+import { BookingStatus, AttributionSource } from '@prisma/client';
 import { config } from '../../config';
 
 export async function getAvailableSlots(creatorId: string, sessionTypeId: string, date: string) {
@@ -116,8 +115,10 @@ export async function createBooking(userId: string, input: CreateBookingInput) {
     throw new ValidationError({ startTime: ['This time slot is no longer available'] });
   }
 
+  // Default to MARKETPLACE attribution for legacy bookings
+  const commissionRate = 20;
   const platformFee = sessionType.price
-    ? Math.round(sessionType.price * (config.platform.feePercent / 100))
+    ? Math.round(sessionType.price * (commissionRate / 100))
     : 0;
 
   const booking = await prisma.booking.create({
@@ -130,6 +131,8 @@ export async function createBooking(userId: string, input: CreateBookingInput) {
       totalAmount: sessionType.price || 0,
       platformFee,
       creatorEarnings: (sessionType.price || 0) - platformFee,
+      attributionSource: AttributionSource.MARKETPLACE,
+      commissionRate,
       studentNotes: input.studentNotes,
       meetingProvider: config.video.provider,
       meetingLink: `${config.video.provider === 'jitsi' ? config.video.jitsiDomain : config.video.jitsiDomain}/${input.creatorId}-${Date.now()}`,
