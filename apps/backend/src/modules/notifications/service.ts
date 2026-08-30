@@ -81,11 +81,11 @@ export async function sendEmail(to: string, subject: string, html: string) {
   }
 }
 
-export async function sendBookingReminder(bookingId: string) {
+export async function sendBookingConfirmation(bookingId: string) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      creator: { select: { id: true, name: true, email: true } },
+      creator: { select: { id: true, name: true, email: true, displayName: true } },
       student: { select: { id: true, name: true, email: true } },
       sessionType: true,
     },
@@ -93,10 +93,83 @@ export async function sendBookingReminder(bookingId: string) {
 
   if (!booking) return;
 
-  const timeStr = booking.startTime.toLocaleString();
-  const subject = `Reminder: Your session with ${booking.creator.name} is coming up`;
+  // Notify mentee
+  await sendNotification({
+    userId: booking.studentId,
+    type: 'booking_confirmed',
+    title: 'Booking Confirmed',
+    body: `Your session "${booking.sessionType.title}" with ${booking.creator.name} has been confirmed`,
+    data: { bookingId: booking.id },
+  });
 
-  for (const user of [booking.creator, booking.student]) {
+  // Notify mentor
+  await sendNotification({
+    userId: booking.creatorId,
+    type: 'new_booking',
+    title: 'New Booking',
+    body: `${booking.student.name} has booked "${booking.sessionType.title}" with you`,
+    data: { bookingId: booking.id },
+  });
+
+  // Send emails with templates
+  const { bookingConfirmationMentee, bookingConfirmationMentor } = require('./emailTemplates');
+
+  await sendEmail(
+    booking.student.email,
+    `Booking Confirmed: ${booking.sessionType.title} with ${booking.creator.name}`,
+    bookingConfirmationMentee({
+      menteeName: booking.student.name,
+      mentorName: booking.creator.displayName || booking.creator.name,
+      serviceTitle: booking.sessionType.title,
+      startTime: booking.startTime,
+      duration: booking.sessionType.duration,
+      meetingLink: booking.meetingLink || undefined,
+      bookingId: booking.id,
+    })
+  );
+
+  await sendEmail(
+    booking.creator.email,
+    `New Booking: ${booking.student.name} booked ${booking.sessionType.title}`,
+    bookingConfirmationMentor({
+      menteeName: booking.student.name,
+      mentorName: booking.creator.displayName || booking.creator.name,
+      serviceTitle: booking.sessionType.title,
+      startTime: booking.startTime,
+      duration: booking.sessionType.duration,
+      meetingLink: booking.meetingLink || undefined,
+      bookingMetadata: booking.bookingMetadata || undefined,
+    })
+  );
+}
+
+export async function sendBookingReminder(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      creator: { select: { id: true, name: true, email: true, displayName: true } },
+      student: { select: { id: true, name: true, email: true } },
+      sessionType: true,
+    },
+  });
+
+  if (!booking) return;
+
+  const now = new Date();
+  const minutesUntil = Math.round((booking.startTime.getTime() - now.getTime()) / 60000);
+
+  const timeStr = booking.startTime.toLocaleString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const { sessionReminder } = require('./emailTemplates');
+
+  // Notify both parties
+  for (const [user, otherParty, isCreator] of [
+    [booking.creator, booking.student, true],
+    [booking.student, booking.creator, false],
+  ] as any[]) {
     await sendNotification({
       userId: user.id,
       type: 'booking_reminder',
@@ -105,6 +178,50 @@ export async function sendBookingReminder(bookingId: string) {
       data: { bookingId: booking.id },
     });
 
-    await sendEmail(user.email, subject, `<h2>Session Reminder</h2><p>Your session "${booking.sessionType.title}" with ${booking.creator.name} starts at ${timeStr}.</p><p>Meeting link: ${booking.meetingLink || 'TBD'}</p>`);
+    await sendEmail(
+      user.email,
+      `Reminder: Your session starts ${minutesUntil <= 60 ? 'soon' : 'in a few hours'}`,
+      sessionReminder({
+        recipientName: user.name,
+        otherPartyName: otherParty.displayName || otherParty.name,
+        serviceTitle: booking.sessionType.title,
+        startTime: booking.startTime,
+        meetingLink: booking.meetingLink || undefined,
+        minutesUntil,
+      })
+    );
   }
+}
+
+export async function sendReviewRequest(bookingId: string) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      creator: { select: { id: true, name: true, displayName: true } },
+      student: { select: { id: true, name: true, email: true } },
+      sessionType: true,
+    },
+  });
+
+  if (!booking) return;
+
+  await sendNotification({
+    userId: booking.studentId,
+    type: 'review_request',
+    title: 'Leave a Review',
+    body: `How was your session with ${booking.creator.name}?`,
+    data: { bookingId: booking.id },
+  });
+
+  const { reviewRequest } = require('./emailTemplates');
+  await sendEmail(
+    booking.student.email,
+    `How was your session with ${booking.creator.name}?`,
+    reviewRequest({
+      menteeName: booking.student.name,
+      mentorName: booking.creator.displayName || booking.creator.name,
+      serviceTitle: booking.sessionType.title,
+      bookingId: booking.id,
+    })
+  );
 }

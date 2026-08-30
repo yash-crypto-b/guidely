@@ -172,4 +172,38 @@ router.get('/my-bookings', authenticate, async (req: Request, res: Response, nex
   } catch (err) { next(err); }
 });
 
+// ─── Reviews ─────────────────────────────────────────────────────────
+
+router.post('/bookings/:id/review', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return sendSuccess(res, null, 400, 'Rating must be between 1 and 5');
+    }
+    const review = await connectionsService.createConnectionReview(
+      req.params.id,
+      req.user!.userId,
+      { rating, comment }
+    );
+    sendSuccess(res, review, 201, 'Review submitted');
+  } catch (err) { next(err); }
+});
+
+// ─── Analytics Tracking ───────────────────────────────────────────────
+
+router.post('/track', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { trackEvent } = require('../analytics/service');
+    const event = await trackEvent({
+      eventType: req.body.eventType,
+      userId: req.user?.userId,
+      sessionId: req.body.sessionId,
+      data: req.body.data,
+      source: req.body.source,
+      page: req.body.page,
+    });
+    sendSuccess(res, event, 201);
+  } catch (err) { next(err); }
+});
+
 export default router;

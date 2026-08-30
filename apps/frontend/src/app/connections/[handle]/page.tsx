@@ -11,6 +11,7 @@ import {
   MapPin, Star, Clock, Briefcase, ExternalLink, Bookmark, Share2,
   Calendar, Video, FileText, MessageCircle, ChevronRight, X, Check
 } from 'lucide-react';
+import type { Metadata } from 'next';
 
 interface MentorProfile {
   id: string;
@@ -190,6 +191,11 @@ export default function MentorProfilePage({ params }: { params: Promise<{ handle
     setTimeout(() => setShareCopied(false), 2000);
   }
 
+  // SEO metadata
+  const seoTitle = profile ? `${profile.name} - ${profile.headline || 'Mentor'} | Guidely` : 'Mentor Profile | Guidely';
+  const seoDescription = profile ? `${profile.name} offers ${profile.creatorTags.map(t => t.tag.name).join(', ')} mentorship. ${profile.bio || ''}`.slice(0, 160) : 'View mentor profile on Guidely';
+  const seoImage = profile?.photoUrl || `${typeof window !== 'undefined' ? window.location.origin : ''}/og-mentor.png`;
+
   if (loading) {
     return (
       <>
@@ -232,6 +238,19 @@ export default function MentorProfilePage({ params }: { params: Promise<{ handle
   return (
     <>
       <Navbar />
+      {/* SEO Meta Tags */}
+      <head>
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:image" content={seoImage} />
+        <meta property="og:type" content="profile" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoTitle} />
+        <meta name="twitter:description" content={seoDescription} />
+        <meta name="twitter:image" content={seoImage} />
+      </head>
       <main className="max-w-5xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Profile Header */}
         <div className="bg-white rounded-xl border p-8 mb-6">
@@ -343,7 +362,7 @@ export default function MentorProfilePage({ params }: { params: Promise<{ handle
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* About */}
@@ -408,8 +427,8 @@ export default function MentorProfilePage({ params }: { params: Promise<{ handle
           </div>
 
           {/* Sidebar: Services */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border p-6 sticky top-24">
+          <div className="space-y-4 order-first lg:order-last">
+            <div className="bg-white rounded-xl border p-6 lg:sticky lg:top-24">
               <h2 className="text-lg font-semibold mb-4">Services</h2>
               <div className="space-y-3">
                 {profile.sessionTypes.map((service) => (

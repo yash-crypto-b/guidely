@@ -146,19 +146,19 @@ export default function ConnectionsPage() {
       <main>
         {/* Hero Section */}
         <section className="bg-gradient-to-br from-primary-50 via-white to-primary-50 border-b">
-          <div className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 py-12 sm:py-16 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto">
-              <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 tracking-tight">
                 Find the right person to{' '}
                 <span className="text-primary-600">guide your next move</span>
               </h1>
-              <p className="mt-6 text-lg text-gray-600">
+              <p className="mt-4 sm:mt-6 text-base sm:text-lg text-gray-600">
                 Connect with experienced professionals for career guidance, resume reviews,
                 mock interviews, technical mentorship, career transitions, and more.
               </p>
 
               {/* Search Bar */}
-              <form onSubmit={handleSearch} className="mt-8 max-w-2xl mx-auto">
+              <form onSubmit={handleSearch} className="mt-6 sm:mt-8 max-w-2xl mx-auto">
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
@@ -166,11 +166,11 @@ export default function ConnectionsPage() {
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     placeholder="Search mentors, skills, roles, or companies"
-                    className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all bg-white shadow-sm"
+                    className="w-full pl-12 pr-24 sm:pr-4 py-3 sm:py-4 text-base sm:text-lg border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all bg-white shadow-sm"
                   />
                   <button
                     type="submit"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary-600 text-white px-6 py-2 rounded-xl hover:bg-primary-700 transition-colors font-medium"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary-600 text-white px-4 sm:px-6 py-2 rounded-xl hover:bg-primary-700 transition-colors font-medium text-sm sm:text-base"
                   >
                     Search
                   </button>
@@ -178,7 +178,7 @@ export default function ConnectionsPage() {
               </form>
 
               {/* Example Searches */}
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <div className="mt-4 flex flex-wrap justify-center gap-2 sm:gap-3">
                 <span className="text-sm text-gray-500">Popular:</span>
                 {EXAMPLE_SEARCHES.map((term) => (
                   <button
@@ -234,7 +234,7 @@ export default function ConnectionsPage() {
           {/* Filter Panel */}
           {showFilters && (
             <div className="bg-white border rounded-xl p-6 mb-6 shadow-sm">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {/* Industry */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
@@ -334,7 +334,7 @@ export default function ConnectionsPage() {
 
           {/* Mentor Cards */}
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="bg-white border rounded-xl p-6 animate-pulse">
                   <div className="flex items-center mb-4">
@@ -365,7 +365,7 @@ export default function ConnectionsPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {mentors.map((mentor) => (
                   <Link
                     key={mentor.id}

@@ -81,6 +81,11 @@ model User {
   savedMentors   SavedMentor[] @relation("SavedMentorUser")
   stripeAccountId String?
   isActive       Boolean        @default(true)
+
+  @@index([role, isActive])
+  @@index([displayName])
+  @@index([industry])
+  @@index([yearsExperience])
 }
 
 model SocialLink {
@@ -105,6 +110,7 @@ model CreatorTag {
   tag       Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([creatorId, tagId])
+  @@index([tagId])
 }
 
 model SessionTypeDefinition {
@@ -128,6 +134,9 @@ model SessionTypeDefinition {
 
   creator     User        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   bookings    Booking[]
+
+  @@index([creatorId, isActive])
+  @@index([deliveryType])
 }
 
 model Availability {
@@ -151,6 +160,7 @@ model BlackoutDate {
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
+  @@index([date])
 }
 
 model Booking {
@@ -184,6 +194,11 @@ model Booking {
   messages         Message[]
   review           Review?
   payment          Payment?
+
+  @@index([creatorId, startTime])
+  @@index([studentId, startTime])
+  @@index([status, startTime])
+  @@index([attributionSource])
 }
 
 model Payment {
@@ -218,6 +233,9 @@ model Review {
   booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   reviewer    User     @relation("Reviewer", fields: [reviewerId], references: [id])
   creator     User     @relation("ReviewedCreator", fields: [creatorId], references: [id])
+
+  @@index([creatorId])
+  @@index([rating])
 }
 
 model Message {
@@ -242,6 +260,36 @@ model SavedMentor {
   mentor User @relation("SavedMentorUser", fields: [mentorId], references: [id], onDelete: Cascade)
 
   @@unique([userId, mentorId])
+}
+
+// ─── Search Performance Indexes ────────────────────────────────────────
+
+model SearchIndex {
+  id        String   @id @default(uuid())
+  entityType String
+  entityId   String
+  content    String
+  metadata   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([content])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  eventType String
+  userId    String?
+  sessionId String?
+  data      Json?
+  source    String?
+  page      String?
+  createdAt DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([userId])
+  @@index([source])
 }
 
 model NotificationPreference {

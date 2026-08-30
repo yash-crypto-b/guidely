@@ -448,6 +448,15 @@ export async function createConnectionBooking(userId: string, mentorHandle: stri
     },
   });
 
+  // Send booking confirmation emails
+  try {
+    const { sendBookingConfirmation } = require('../notifications/service');
+    await sendBookingConfirmation(booking.id);
+  } catch (emailError) {
+    console.error('Failed to send booking confirmation:', emailError);
+    // Don't fail the booking if email fails
+  }
+
   return booking;
 }
 
@@ -590,6 +599,53 @@ export async function getMenteeBookings(userId: string, page = 1, limit = 20) {
   ]);
 
   return { bookings, total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────
+
+export async function createConnectionReview(
+  bookingId: string,
+  reviewerId: string,
+  input: { rating: number; comment?: string }
+) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { review: true },
+  });
+
+  if (!booking) throw new NotFoundError('Booking');
+  if (booking.studentId !== reviewerId) throw new ForbiddenError('Only the mentee can leave a review');
+  if (booking.status !== 'COMPLETED') throw new ValidationError({ booking: ['Can only review completed sessions'] });
+  if (booking.review) throw new ValidationError({ booking: ['Already reviewed'] });
+
+  const review = await prisma.review.create({
+    data: {
+      bookingId,
+      reviewerId,
+      creatorId: booking.creatorId,
+      rating: input.rating,
+      comment: input.comment,
+    },
+    include: {
+      reviewer: { select: { id: true, name: true, photoUrl: true } },
+    },
+  });
+
+  // Send review notification to mentor
+  try {
+    const { sendNotification } = require('../notifications/service');
+    await sendNotification({
+      userId: booking.creatorId,
+      type: 'review_received',
+      title: 'New Review',
+      body: `You received a ${input.rating}-star review`,
+      data: { bookingId, reviewId: review.id },
+    });
+  } catch (error) {
+    console.error('Failed to send review notification:', error);
+  }
+
+  return review;
 }
 
 // ─── Recommendations (placeholder) ────────────────────────────────────
