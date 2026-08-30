@@ -80,6 +80,9 @@ const schema = z.object({
   // Error tracking (optional - for production monitoring)
   SENTRY_DSN: z.string().optional(),
   ERROR_TRACKING_ENABLED: z.coerce.boolean().default(true),
+
+  // Debug endpoint (optional - set to enable /health/errors)
+  DEBUG_API_KEY: z.string().optional(),
 });
 
 // Clean all string env vars before validation (strip quotes, trailing slashes)

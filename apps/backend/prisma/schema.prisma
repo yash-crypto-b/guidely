@@ -66,6 +66,7 @@ model User {
   languages       String[] @default([])
   linkedInUrl     String?
   portfolioUrl    String?
+  resumeUrl       String?
   hourlyRate      Int?
 
   creatorTags    CreatorTag[]

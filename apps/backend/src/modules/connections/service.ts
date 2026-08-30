@@ -28,6 +28,7 @@ export async function updateMentorProfile(userId: string, input: UpdateMentorPro
   if (input.languages !== undefined) data.languages = input.languages;
   if (input.linkedInUrl !== undefined) data.linkedInUrl = input.linkedInUrl;
   if (input.portfolioUrl !== undefined) data.portfolioUrl = input.portfolioUrl;
+  if (input.resumeUrl !== undefined) data.resumeUrl = input.resumeUrl;
   if (input.hourlyRate !== undefined) data.hourlyRate = input.hourlyRate;
   if (input.headline !== undefined) data.headline = input.headline;
   if (input.bio !== undefined) data.bio = input.bio;

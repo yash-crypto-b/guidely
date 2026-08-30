@@ -11,6 +11,7 @@ export const updateMentorProfileSchema = z.object({
   hourlyRate: z.number().int().min(0).optional().nullable(),
   headline: z.string().max(200).optional().nullable(),
   bio: z.string().max(2000).optional().nullable(),
+  resumeUrl: z.string().url().optional().nullable(),
   expertiseTags: z.array(z.string()).optional(),
   socialLinks: z.array(z.object({
     platform: z.string(),

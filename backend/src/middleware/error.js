@@ -57,7 +57,7 @@ export function errorHandler(err, req, res, _next) {
     // 4xx: always show the message (validation errors, not-found, etc.)
     message = err.message;
   } else if (isProd) {
-    // 5xx in production: safe generic message
+    // 5xx in production: safe generic message, but include requestId for debugging
     message = 'Something went wrong on our end. Please try again in a moment.';
   } else {
     // 5xx in development: show the real error for debugging
@@ -66,6 +66,8 @@ export function errorHandler(err, req, res, _next) {
 
   res.status(status).json({
     error: message,
+    // Include the error name so frontend can distinguish error types
+    code: err.name || 'UNKNOWN_ERROR',
     requestId: req.requestId,
     ...(isProd ? {} : { 
       _debug: { 

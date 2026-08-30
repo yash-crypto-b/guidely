@@ -23,6 +23,14 @@ export const config = {
     issuer: process.env.JWT_ISSUER || 'guidely',
   },
 
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    anonKey: process.env.SUPABASE_ANON_KEY || '',
+    jwtSecret: process.env.SUPABASE_JWT_SECRET || '',
+  },
+
+  debugApiKey: process.env.DEBUG_API_KEY || '',
+
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',

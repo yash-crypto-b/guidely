@@ -18,4 +18,14 @@ services:
       # - JWT_SECRET
       # - STRIPE_SECRET_KEY
       # - STRIPE_WEBHOOK_SECRET
+      # - SUPABASE_URL
+      # - SUPABASE_SECRET_KEY
+      # - SUPABASE_JWT_SECRET
     healthCheckPath: /health
+
+  # ─── Keepalive ───────────────────────────────────────────────────────
+  # The backend self-pings /health/keepalive every 10 min on startup.
+  # For Render free-tier, also set up an external cron to prevent spin-down:
+  #   Option A: cron-job.org (free) — ping https://guidely-backend.onrender.com/health/keepalive
+  #   Option B: UptimeRobot (free) — add HTTP monitor on /health/keepalive
+  #   Option C: node scripts/keepalive.js (run on any server)

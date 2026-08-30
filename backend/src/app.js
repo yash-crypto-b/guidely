@@ -1,6 +1,8 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+// Patch console FIRST so all subsequent logs are captured by the buffer.
+import '../lib/logBuffer.js';
 import { env, isProd } from './config/env.js';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { notFound, errorHandler } from './middleware/error.js';

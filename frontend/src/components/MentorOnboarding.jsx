@@ -133,7 +133,7 @@ export function MentorOnboarding({ user, onComplete, onClose }) {
       }
 
       // Create mentor profile via API
-      const payload = {
+      const profilePayload = {
         headline: form.headline,
         company: form.company || null,
         industry: form.industry || null,
@@ -145,17 +145,6 @@ export function MentorOnboarding({ user, onComplete, onClose }) {
         linkedInUrl: form.linkedInUrl || null,
         portfolioUrl: form.portfolioUrl || null,
         resumeUrl,
-        services: form.services.map(s => {
-          const serviceType = SERVICE_TYPES.find(st => st.value === s);
-          return {
-            title: serviceType?.label || s,
-            deliveryType: s,
-            description: getServiceDescription(s),
-            duration: 30,
-            price: form.servicePrice ? parseInt(form.servicePrice) * 100 : 0,
-            isFree: !form.servicePrice || parseInt(form.servicePrice) === 0,
-          };
-        }),
       };
 
       const res = await fetch(`${API_BASE}/api/v1/connections/profile`, {
@@ -164,24 +153,36 @@ export function MentorOnboarding({ user, onComplete, onClose }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(profilePayload),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || 'Failed to save profile');
+        throw new Error(err.error || err.message || 'Failed to save profile');
       }
 
-      // Create services
-      for (const service of payload.services) {
-        await fetch(`${API_BASE}/api/v1/connections/services`, {
+      // Create services separately
+      for (const serviceType of form.services) {
+        const serviceTypeInfo = SERVICE_TYPES.find(st => st.value === serviceType);
+        const servicePayload = {
+          title: serviceTypeInfo?.label || serviceType,
+          deliveryType: serviceType,
+          description: getServiceDescription(serviceType),
+          duration: 30,
+          price: form.servicePrice ? parseInt(form.servicePrice) * 100 : 0,
+          isFree: !form.servicePrice || parseInt(form.servicePrice) === 0,
+        };
+        const svcRes = await fetch(`${API_BASE}/api/v1/connections/services`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(service),
+          body: JSON.stringify(servicePayload),
         });
+        if (!svcRes.ok) {
+          console.error('Failed to create service:', serviceType, await svcRes.json());
+        }
       }
 
       onComplete?.();

@@ -88,16 +88,23 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
     const userId = req.user.id;
     const {
       headline, bio, company, industry, location, yearsExperience,
-      languages, linkedInUrl, portfolioUrl, hourlyRate,
+      languages, linkedInUrl, portfolioUrl, hourlyRate, resumeUrl,
       expertiseTags, socialLinks
     } = req.body;
 
+    console.log(`[PUT /profile] user=${userId} fields=${Object.keys(req.body).join(',')}`);
+
     // Auto-promote to CREATOR role if needed
-    const { data: currentUser } = await supabaseAdmin
+    const { data: currentUser, error: userFetchErr } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', userId)
       .single();
+
+    if (userFetchErr || !currentUser) {
+      console.error(`[PUT /profile] User lookup failed for ${userId}:`, userFetchErr);
+      return res.status(404).json({ error: 'User not found in database' });
+    }
 
     const updateData = {};
     if (headline !== undefined) updateData.headline = headline;
@@ -110,6 +117,7 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
     if (linkedInUrl !== undefined) updateData.linkedin_url = linkedInUrl;
     if (portfolioUrl !== undefined) updateData.portfolio_url = portfolioUrl;
     if (hourlyRate !== undefined) updateData.hourly_rate = hourlyRate;
+    if (resumeUrl !== undefined) updateData.resume_url = resumeUrl;
     if (currentUser?.role === 'STUDENT') {
       updateData.role = 'CREATOR';
     }
@@ -120,60 +128,86 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
       .eq('id', userId);
 
     if (updateError) {
-      console.error('Profile update error:', updateError);
-      return res.status(500).json({ error: 'Failed to update profile' });
+      console.error(`[PUT /profile] User update failed for ${userId}:`, updateError);
+      return res.status(500).json({ error: 'Failed to update profile', details: updateError.message });
     }
 
     // Update expertise tags
-    if (expertiseTags) {
+    if (Array.isArray(expertiseTags)) {
       // Delete existing tags
-      await supabaseAdmin
+      const { error: delErr } = await supabaseAdmin
         .from('creator_tags')
         .delete()
         .eq('creator_id', userId);
 
+      if (delErr) {
+        console.error(`[PUT /profile] Failed to delete old tags for ${userId}:`, delErr);
+        // Continue — non-fatal, new inserts may still succeed
+      }
+
       // Upsert new tags and create associations
       for (const tagName of expertiseTags) {
-        // Upsert tag
-        let { data: tag } = await supabaseAdmin
-          .from('tags')
-          .select('id')
-          .eq('name', tagName)
-          .single();
-
-        if (!tag) {
-          const { data: newTag } = await supabaseAdmin
+        try {
+          // Upsert tag
+          let { data: tag, error: tagErr } = await supabaseAdmin
             .from('tags')
-            .insert({ name: tagName })
             .select('id')
-            .single();
-          tag = newTag;
-        }
+            .eq('name', tagName)
+            .maybeSingle();
 
-        if (tag) {
-          await supabaseAdmin
-            .from('creator_tags')
-            .insert({ creator_id: userId, tag_id: tag.id });
+          if (tagErr) {
+            console.error(`[PUT /profile] Tag lookup failed for "${tagName}":`, tagErr);
+            continue;
+          }
+
+          if (!tag) {
+            const { data: newTag, error: insertErr } = await supabaseAdmin
+              .from('tags')
+              .insert({ name: tagName })
+              .select('id')
+              .single();
+            if (insertErr) {
+              console.error(`[PUT /profile] Tag insert failed for "${tagName}":`, insertErr);
+              continue;
+            }
+            tag = newTag;
+          }
+
+          if (tag) {
+            const { error: ctErr } = await supabaseAdmin
+              .from('creator_tags')
+              .insert({ creator_id: userId, tag_id: tag.id });
+            if (ctErr) {
+              console.error(`[PUT /profile] creator_tags insert failed for "${tagName}":`, ctErr);
+            }
+          }
+        } catch (tagLoopErr) {
+          console.error(`[PUT /profile] Unexpected error processing tag "${tagName}":`, tagLoopErr);
         }
       }
     }
 
     // Update social links
-    if (socialLinks) {
+    if (Array.isArray(socialLinks)) {
       await supabaseAdmin
         .from('social_links')
         .delete()
         .eq('user_id', userId);
 
       if (socialLinks.length > 0) {
-        await supabaseAdmin
+        const { error: slErr } = await supabaseAdmin
           .from('social_links')
           .insert(socialLinks.map(link => ({ user_id: userId, ...link })));
+        if (slErr) {
+          console.error(`[PUT /profile] Social links insert failed for ${userId}:`, slErr);
+        }
       }
     }
 
+    console.log(`[PUT /profile] Profile updated successfully for ${userId}`);
     res.json({ message: 'Profile updated' });
   } catch (err) {
+    console.error(`[PUT /profile] Unhandled error:`, err);
     next(err);
   }
 });
