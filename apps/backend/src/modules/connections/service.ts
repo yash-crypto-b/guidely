@@ -13,11 +13,14 @@ import { Role, AttributionSource, BookingStatus } from '@prisma/client';
 export async function updateMentorProfile(userId: string, input: UpdateMentorProfileInput) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new NotFoundError('User');
-  if (user.role !== Role.CREATOR && user.role !== Role.ADMIN && user.role !== Role.SUPERADMIN) {
-    throw new ForbiddenError('Only creators can update mentor profiles');
+
+  // Auto-promote to CREATOR role on first mentor profile update
+  const needsPromotion = user.role === Role.STUDENT;
+  const data: Record<string, any> = {};
+  if (needsPromotion) {
+    data.role = Role.CREATOR;
   }
 
-  const data: Record<string, any> = {};
   if (input.company !== undefined) data.company = input.company;
   if (input.industry !== undefined) data.industry = input.industry;
   if (input.location !== undefined) data.location = input.location;
