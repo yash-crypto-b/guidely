@@ -9,6 +9,7 @@ import { healthRouter } from './routes/health.js';
 import { meRouter } from './routes/me.js';
 import { analysisRouter } from './routes/analysis.js';
 import { statsRouter } from './routes/stats.js';
+import { connectionsRouter } from './routes/connections.js';
 import { nvidiaCircuitBreaker } from './lib/circuitBreaker.js';
 import { getAIServiceHealth } from './lib/ai.js';
 import { errorTracker, ErrorCategory } from './lib/errorTracker.js';
@@ -109,6 +110,7 @@ export function buildApp() {
   app.use('/me', meRouter);
   app.use('/api/analyze', analysisRouter);
   app.use('/api/stats', statsRouter);
+  app.use('/api/v1/connections', connectionsRouter);
 
   app.use(notFound);
   app.use(errorHandler);
