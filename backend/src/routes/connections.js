@@ -94,16 +94,34 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
 
     console.log(`[PUT /profile] user=${userId} fields=${Object.keys(req.body).join(',')}`);
 
-    // Auto-promote to CREATOR role if needed
-    const { data: currentUser, error: userFetchErr } = await supabaseAdmin
+    // Ensure a users row exists — Supabase Auth creates auth.users but not
+    // necessarily public.users.  Upsert so first-time onboarding works.
+    let { data: currentUser, error: userFetchErr } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (userFetchErr || !currentUser) {
-      console.error(`[PUT /profile] User lookup failed for ${userId}:`, userFetchErr);
-      return res.status(404).json({ error: 'User not found in database' });
+    if (!currentUser) {
+      // Auto-create from Supabase auth metadata
+      const meta = req.user?.user_metadata || {};
+      const insertData = {
+        id: userId,
+        email: req.user?.email || '',
+        name: meta.full_name || meta.name || req.user?.email?.split('@')[0] || 'User',
+        role: 'STUDENT',
+      };
+      console.log(`[PUT /profile] Auto-creating users row for ${userId}`);
+      const { data: created, error: createErr } = await supabaseAdmin
+        .from('users')
+        .insert(insertData)
+        .select('role')
+        .single();
+      if (createErr) {
+        console.error(`[PUT /profile] Failed to auto-create users row for ${userId}:`, createErr);
+        return res.status(500).json({ error: 'Failed to initialise user profile', details: createErr.message });
+      }
+      currentUser = created;
     }
 
     const updateData = {};
