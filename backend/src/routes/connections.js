@@ -96,32 +96,37 @@ connectionsRouter.put('/profile', requireAuth, async (req, res, next) => {
 
     // Ensure a users row exists — Supabase Auth creates auth.users but not
     // necessarily public.users.  Upsert so first-time onboarding works.
-    let { data: currentUser, error: userFetchErr } = await supabaseAdmin
+    let { data: currentUser } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', userId)
       .maybeSingle();
 
     if (!currentUser) {
-      // Auto-create from Supabase auth metadata
+      // Auto-create from Supabase auth metadata via upsert.
       const meta = req.user?.user_metadata || {};
-      const insertData = {
-        id: userId,
-        email: req.user?.email || '',
-        name: meta.full_name || meta.name || req.user?.email?.split('@')[0] || 'User',
-        role: 'STUDENT',
-      };
-      console.log(`[PUT /profile] Auto-creating users row for ${userId}`);
-      const { data: created, error: createErr } = await supabaseAdmin
+      const { error: upsertErr } = await supabaseAdmin
         .from('users')
-        .insert(insertData)
-        .select('role')
-        .single();
-      if (createErr) {
-        console.error(`[PUT /profile] Failed to auto-create users row for ${userId}:`, createErr);
-        return res.status(500).json({ error: 'Failed to initialise user profile', details: createErr.message });
+        .upsert({
+          id: userId,
+          email: req.user?.email || '',
+          name: meta.full_name || meta.name || req.user?.email?.split('@')[0] || 'User',
+          role: 'STUDENT',
+        }, { onConflict: 'id' });
+
+      if (upsertErr) {
+        // Non-fatal: log and continue.  The update below will also fail
+        // if the row truly can't be created, giving us a 500 either way.
+        console.warn(`[PUT /profile] Could not auto-create users row for ${userId}:`, upsertErr.message);
       }
-      currentUser = created;
+
+      // Re-fetch to get the role
+      const { data: refetched } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+      currentUser = refetched;
     }
 
     const updateData = {};
